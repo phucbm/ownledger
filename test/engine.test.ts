@@ -82,6 +82,40 @@ describe("computations on the demo ledger", () => {
     expect(c.toPay).toBe(c.statementBalance! - c.paidSinceStatement);
     expect(c.available).toBe(50000000 - c.owed);
   });
+  it("card period: spending by category, refunds and cashback since the last statement", () => {
+    const c = cards(L, "2026-10-31")[0]!;
+    expect(c.product).toBe("Demo Visa Cashback");
+    expect(c.bank).toBe("Demo Bank");
+    expect(c.period.basis).toBe("statement");
+    expect(c.period.from).toBe("2026-10-21");
+    expect(c.period.to).toBe("2026-10-31");
+    expect(c.period.refunds).toBe(50000);
+    expect(c.period.cashback).toBe(25000);
+    const groceries = c.period.byCategory.find((x) => x.category === "food/groceries")!;
+    expect(groceries.amount).toBe(300000); // 350,000 spent - 50,000 refunded
+    expect(c.period.byCategory.reduce((a, x) => a + x.amount, 0)).toBe(c.period.spent - c.period.refunds);
+  });
+  it("card period without a statement day is the calendar month; mixed transactions are left out", () => {
+    const files: FileMap = {
+      "data/meta.yaml": "format: 1\nbase: VND\n",
+      "data/assets.yaml": "- {id: VND}\n",
+      "data/categories.yaml": "income: [{id: cashback, name: Cashback}]\nexpense: [{id: food, name: Food}]\n",
+      "data/accounts.yaml": "- {id: cash, name: Cash, type: cash}\n- {id: card, name: Card, type: credit_card}\n",
+      "data/ledger/2026/10.jsonl": '{"id":"t1","date":"2026-10-30","lines":[{"account":"card","amount":-100},{"category":"food","amount":100}]}',
+      "data/ledger/2026/11.jsonl": [
+        '{"id":"t2","date":"2026-11-02","lines":[{"account":"card","amount":-300},{"category":"food","amount":300}]}',
+        '{"id":"t3","date":"2026-11-03","lines":[{"account":"card","amount":-200},{"account":"cash","amount":-100},{"category":"food","amount":300}]}',
+        '{"id":"t4","date":"2026-11-04","lines":[{"account":"cash","amount":-400},{"account":"card","amount":400}]}',
+        '{"id":"t5","date":"2026-11-05","lines":[{"account":"card","amount":20},{"category":"cashback","amount":-20}]}',
+      ].join("\n"),
+    };
+    const r = checkFiles(files);
+    expect(r.errors).toEqual([]);
+    const c = cards(r.ledger, "2026-11-10")[0]!;
+    // t1 is last month, t3 is mixed (not split), t4 is a card payment (a transfer, never spending)
+    expect(c.period).toMatchObject({ basis: "month", from: "2026-11-01", to: "2026-11-10", spent: 300, refunds: 0, mixed: 1, cashback: 20 });
+    expect(c.product).toBeNull();
+  });
   it("deposits: maturity and interest", () => {
     const d = deposits(L, "2026-10-31");
     expect(d.map((x) => x.account)).toEqual(["dep-6m"]); // dep-2024 is closed

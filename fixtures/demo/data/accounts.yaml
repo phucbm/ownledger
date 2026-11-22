@@ -24,6 +24,7 @@
     due_day: 5
     limit: 50000000
     bank: Demo Bank
+    product: Demo Visa Cashback
 - id: spaylater
   name: SPayLater
   type: bnpl

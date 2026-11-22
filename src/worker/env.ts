@@ -12,6 +12,8 @@ export interface Env {
   /** GitHub logins allowed to sign in, comma-separated */
   ALLOWED_LOGINS: string;
   TIMEZONE?: string;
+  /** OpenWallet's MCP URL: turns on best_card (an outside source; unset = off) */
+  OPENWALLET_URL?: string;
   // secrets (wrangler secret put; never in the repo)
   GITHUB_APP_ID: string;
   GITHUB_APP_PRIVATE_KEY: string;
@@ -25,6 +27,8 @@ export interface Env {
 
 export interface Props {
   login: string;
+  /** The connected app's name (from its OAuth registration), recorded on writes. Missing on tokens issued before 1.1.0. */
+  client?: string;
 }
 
 export function allowed(env: Env, login: string): boolean {

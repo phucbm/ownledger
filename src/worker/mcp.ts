@@ -20,9 +20,11 @@ import { series, type SeriesQuery } from "../engine/insights.js";
 import { yamlText } from "../engine/write.js";
 import { dashboardOf } from "./api.js";
 import { cardList } from "../modules/cards/index.js";
-import { bestCard, cashback, closeOnOrAfter, feeWaiver, lineKind, nextClose, statements } from "../modules/cards/statements.js";
+import { cashback, closeOnOrAfter, feeWaiver, lineKind, nextClose, statements } from "../modules/cards/statements.js";
 import { cardsData, STATEMENTS_FILE, termsOf, recordFor } from "../modules/cards/terms.js";
 import { parse as parseYaml } from "yaml";
+import { bestCard } from "./bestcard.js";
+import { openWalletClient, type OpenWallet } from "./openwallet.js";
 
 type Result = { content: { type: "text"; text: string }[]; isError?: boolean };
 const out = (v: unknown): Result => ({ content: [{ type: "text", text: typeof v === "string" ? v : JSON.stringify(v) }] });
@@ -33,6 +35,8 @@ Amounts are whole numbers in the base currency (see about). Answers are computed
 Writes: the add_/edit_/void_/set_/remove_ tools only PREVIEW. Show the owner the preview (what, amounts, accounts), wait for their explicit go, then call apply with the preview_id. Never invent an amount, date, account or category: ask. Call rules once before the first write.
 Dashboard: when the owner asks to "track", "watch" or "put on my dashboard" something, offer a widget (add_widget), using the categories and accounts from rules.
 Cards: for "which card should I use", call best_card; statements, cashback and fee waivers come from cards and card_statement.`;
+const OPENWALLET_LINE = `
+best_card also asks OpenWallet (an outside card catalog the owner turned on) for cards without the owner's own cashback terms: give it the amount and a merchant or kind. It gets those cards' product names, the purchase and their spend this period. Quote OpenWallet's figures with its date and link (source: openwallet); unknown is not 0. If a card is in not_matched, say so and how to fix it.`;
 
 function compactTx(t: Transaction) {
   return {
@@ -45,6 +49,7 @@ function compactTx(t: Transaction) {
     ...(t.tags?.length ? { tags: t.tags } : {}),
     ...(t.plan ? { plan: t.plan } : {}),
     ...(t.void ? { void: true } : {}),
+    ...(t.trail?.length ? { reason: t.trail[t.trail.length - 1]!.reason } : {}),
     lines: t.lines.map((l) => [l.account ?? l.category, l.amount, ...(l.qty !== undefined ? [`${l.qty} ${l.asset ?? ""}`.trim()] : [])]),
   };
 }
@@ -73,12 +78,26 @@ const txFields = {
   plan: z.string().optional().describe("plan id this pays (instalment, loan, premium)"),
 };
 
-export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(env)): McpServer {
-  const server = new McpServer({ name: "ownledger", version: VERSION }, { instructions: INSTRUCTIONS });
+const reason = z
+  .string()
+  .trim()
+  .min(3)
+  .max(A.REASON_MAX)
+  .describe("Required. One line: what the owner asked for, close to their own words (kept on the transaction's trail and in the commit).");
+
+export interface Deps {
+  /** OpenWallet client; by default made from env.OPENWALLET_URL (unset = off) */
+  openwallet?: OpenWallet | null;
+}
+
+export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(env), deps: Deps = {}): McpServer {
+  const ow = deps.openwallet !== undefined ? deps.openwallet : env.OPENWALLET_URL ? openWalletClient(env.OPENWALLET_URL) : null;
+  const server = new McpServer({ name: "ownledger", version: VERSION }, { instructions: INSTRUCTIONS + (ow ? OPENWALLET_LINE : "") });
   const tz = env.TIMEZONE || "Asia/Ho_Chi_Minh";
   const now = () => todayIn(tz);
   const snap = () => snapshot(env, src);
   const ro = { readOnlyHint: true, openWorldHint: false } as const;
+  const meta = (reason: string): A.WriteMeta => ({ via: "mcp", ...(props.client ? { client: props.client } : {}), reason });
 
   const wrap =
     <T,>(fn: (args: T) => Promise<unknown>) =>
@@ -145,6 +164,7 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
         "Amounts are positive whole numbers in the base currency in the simple form; lines are signed and sum to 0.",
         "Moves between the owner's accounts (card payments, savings, investments, loans) are transfers, never expense or income.",
         "Correct a mistake with edit_transaction or void_transaction; never add a reversing entry unless asked.",
+        "Every add_/edit_/void_transaction needs reason: one line saying what the owner asked, close to their own words (it is kept on the transaction and in the commit).",
       ],
       base: s.ledger.meta.base,
       categories: {
@@ -271,9 +291,10 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
     }),
   );
 
-  server.registerTool("cards", { description: "Credit cards: owed, limit, last statement (to pay, due, paid or not), cashback this period, annual fee waiver, terms still missing.", inputSchema: z.object({ date: z.string().optional(), include_closed: z.boolean().optional() }), annotations: ro }, wrap(async ({ date, include_closed }) => {
+  server.registerTool("cards", { description: "Credit cards: owed, limit, last statement (to pay, due, paid or not), cashback this period, this statement period (spent by category, refunds, cashback booked), product name, annual fee waiver, terms still missing.", inputSchema: z.object({ date: z.string().optional(), include_closed: z.boolean().optional() }), annotations: ro }, wrap(async ({ date, include_closed }) => {
     const s = await snap();
     const asOf = date ?? now();
+    const per = new Map(cards(s.ledger, asOf).map((x) => [x.account, x]));
     return cardList(s.ledger, asOf, { includeClosed: include_closed }).map((c) => ({
       account: c.account,
       name: c.name,
@@ -282,6 +303,9 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
       last_statement: c.last ? { date: c.last.close, amount_due: c.last.amountDue, paid: c.last.paid, to_pay: c.last.toPay, due: c.last.due, status: c.last.status, ...(c.last.bank !== null ? { bank: c.last.bank, diff: c.last.bankDiff } : {}) } : null,
       this_period: c.current ? { from: c.current.from, purchases: c.current.purchases } : null,
       cashback: c.cashback ? { spend: c.cashback.spend, expected: c.cashback.expected, cap_left: c.cashback.capLeft, min_met: c.cashback.minMet, need_for_min: c.cashback.needForMin, ...(c.cashback.incomplete ? { note: "some rates not set" } : {}) } : null,
+      ...(c.bank ? { bank: c.bank } : {}),
+      ...(per.get(c.account)?.product ? { product: per.get(c.account)!.product } : {}),
+      ...(per.get(c.account) ? { period: (({ from, to, spent, refunds, byCategory, cashback }) => ({ from, to, spent, refunds, by_category: byCategory, cashback_booked: cashback }))(per.get(c.account)!.period) } : {}),
       fee_waiver: feeWaiver(s.ledger, c.account, asOf),
       ...(c.missing.length ? { missing: c.missing } : {}),
     }));
@@ -303,10 +327,22 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
 
   server.registerTool(
     "best_card",
-    { description: "Which card to use for a purchase: open cards ranked by cashback for the category (cap left, minimum spend), then interest-free days, then limit left, each with a one-line reason.", inputSchema: z.object({ category: z.string().describe("category path, e.g. food/groceries"), amount: z.number().int().positive().optional(), date: z.string().optional() }), annotations: ro },
-    wrap(async ({ category, amount, date }) => {
+    {
+      description:
+        "Which card to use for one purchase: open cards ranked by cashback (cap left, minimum spend), then interest-free days, then limit left, each with its source. Cards with the owner's own cashback terms are ranked here; with OpenWallet on, cards without terms are looked up there (needs amount and merchant or kind; sends those cards' product names and banks, the purchase, and their spend and cashback this period).",
+      inputSchema: z.object({
+        category: z.string().optional().describe("the owner's category path, e.g. food/groceries: picks the rate from the owner's terms, adds the budget left"),
+        amount: z.number().int().positive().optional().describe("the purchase, whole base-currency units"),
+        merchant: z.string().optional().describe("OpenWallet: where, e.g. Shopee, Co.opmart, Grab"),
+        kind: z.string().optional().describe("OpenWallet: what kind when no merchant, e.g. groceries, dining, fuel, travel"),
+        date: z.string().optional().describe("yyyy-mm-dd, default today"),
+        accounts: z.array(z.string()).optional().describe("only these card account ids"),
+      }),
+      annotations: { readOnlyHint: true, openWorldHint: Boolean(ow) },
+    },
+    wrap(async (a) => {
       const s = await snap();
-      return bestCard(s.ledger, { category, amount, date: date ?? now() }).slice(0, 5);
+      return bestCard(s.ledger, now(), ow, a);
     }),
   );
 
@@ -337,30 +373,30 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
     "add_transaction",
     {
       description: "PREVIEW a new transaction (writes nothing). Simple form: kind + amount + account (+ category or to_account). Full form: lines.",
-      inputSchema: z.object(txFields),
+      inputSchema: z.object({ ...txFields, reason }),
       annotations: pv,
     },
-    wrap(async (a) => {
+    wrap(async ({ reason, ...a }) => {
       // with the pool on, an unnamed account is the pool's default account
       if (!a.lines?.length && !a.account) {
         const s = await snap();
         const p = poolOf(s.ledger, dashboardOf(s.files, props.login)?.prefs?.pool, now());
         if (p.on && p.default_account) a = { ...a, account: p.default_account };
       }
-      return preview((f) => A.addTransaction(f, a));
+      return preview((f) => A.addTransaction(f, a, meta(reason)));
     }),
   );
 
   server.registerTool(
     "edit_transaction",
-    { description: "PREVIEW changes to a transaction by id (only the fields given change).", inputSchema: z.object({ id: z.string(), ...txFields, date: z.string().optional() }), annotations: pv },
-    wrap(async ({ id, ...patch }) => preview((f) => A.editTransaction(f, id, patch))),
+    { description: "PREVIEW changes to a transaction by id (only the fields given change).", inputSchema: z.object({ id: z.string(), ...txFields, date: z.string().optional(), reason }), annotations: pv },
+    wrap(async ({ id, reason, ...patch }) => preview((f) => A.editTransaction(f, id, patch, meta(reason)))),
   );
 
   server.registerTool(
     "void_transaction",
-    { description: "PREVIEW voiding a transaction (kept in history, excluded everywhere).", inputSchema: z.object({ id: z.string(), reason: z.string().optional() }), annotations: pv },
-    wrap(async ({ id, reason }) => preview((f) => A.voidTransaction(f, id, reason))),
+    { description: "PREVIEW voiding a transaction (kept in history, excluded everywhere).", inputSchema: z.object({ id: z.string(), reason }), annotations: pv },
+    wrap(async ({ id, reason }) => preview((f) => A.voidTransaction(f, id, reason, meta(reason)))),
   );
 
   const accountFields = {

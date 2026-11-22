@@ -1,4 +1,4 @@
-# 002: Vietnamese copy for review
+# 003: Vietnamese copy for review
 
 Generated 2026-11-22 from `web/src/i18n/vi.ts` and `en.ts` (575 strings). Mark changes in the Vietnamese column; your own data (account and category names, notes) is never translated.
 

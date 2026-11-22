@@ -4,7 +4,7 @@ import { flattenCategories } from "./categories.js";
 import { isDate } from "./dates.js";
 import { LEDGER_FILE_RE, loadLedger, parseJsonl, PATHS, type FileMap } from "./load.js";
 import { applyChange, describeChange, yamlText, type Change } from "./write.js";
-import type { Account, CategoriesFile, CategoryNode, Issue, Line, Plan, Price, Transaction } from "./types.js";
+import type { Account, CategoriesFile, CategoryNode, Issue, Line, Plan, Price, Transaction, TrailEntry } from "./types.js";
 
 /**
  * Write actions: each builds a Change from a request, applies it in memory and checks the result.
@@ -42,6 +42,36 @@ export function plan(files: FileMap, change: Change, message: string): Planned {
 
 /* ------------------------------------------------------------------ transactions */
 
+/** Who/what is making a write, recorded on the transaction's trail and in the commit message. */
+export interface WriteMeta {
+  via: string;
+  client?: string;
+  reason?: string;
+  at?: string; // default: now
+}
+
+export const REASON_MAX = 200;
+
+function trailed(t: Transaction, op: TrailEntry["op"], meta?: WriteMeta): Transaction {
+  if (!meta) return t;
+  const reason = meta.reason?.trim().replace(/\s+/g, " ");
+  if (reason && reason.length > REASON_MAX) throw new ActionError(`reason is too long (max ${REASON_MAX} characters)`);
+  const e: TrailEntry = {
+    op,
+    at: meta.at ?? new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+    via: meta.via,
+    ...(meta.client ? { client: meta.client } : {}),
+    ...(reason ? { reason } : {}),
+  };
+  return { ...t, trail: [...(Array.isArray(t.trail) ? t.trail : []), e] };
+}
+
+function withMeta(message: string, meta?: WriteMeta): string {
+  if (!meta) return message;
+  const lines = [meta.reason?.trim() ? `Reason: ${meta.reason.trim().replace(/\s+/g, " ")}` : "", `Via: ${meta.via}${meta.client ? ` (${meta.client})` : ""}`].filter(Boolean);
+  return `${message}\n\n${lines.join("\n")}`;
+}
+
 export interface SimpleTx {
   date: string;
   time?: string | null;
@@ -75,7 +105,7 @@ export function linesOf(t: SimpleTx): Line[] {
     : [{ account: t.account, amount: -a }, { category: t.category, amount: a }];
 }
 
-export function addTransaction(files: FileMap, t: SimpleTx): Planned {
+export function addTransaction(files: FileMap, t: SimpleTx, meta?: WriteMeta): Planned {
   if (!isDate(t.date)) throw new ActionError("date must be yyyy-mm-dd");
   const tx: Transaction = {
     id: newId(),
@@ -88,7 +118,7 @@ export function addTransaction(files: FileMap, t: SimpleTx): Planned {
     ...(t.plan ? { plan: t.plan } : {}),
     lines: linesOf(t),
   };
-  return plan(files, { addTransactions: [tx] }, `Add: ${t.date} ${t.note ?? ""}`.trim());
+  return plan(files, { addTransactions: [trailed(tx, "add", meta)] }, withMeta(`Add: ${t.date} ${t.note ?? ""}`.trim(), meta));
 }
 
 function findTx(files: FileMap, id: string): Transaction {
@@ -100,7 +130,7 @@ function findTx(files: FileMap, id: string): Transaction {
   throw new ActionError(`no transaction ${id}`);
 }
 
-export function editTransaction(files: FileMap, id: string, patch: Partial<SimpleTx>): Planned {
+export function editTransaction(files: FileMap, id: string, patch: Partial<SimpleTx>, meta?: WriteMeta): Planned {
   const old = findTx(files, id);
   const next: Transaction = { ...old };
   for (const k of ["date", "time", "note", "who", "event", "tags", "plan"] as const) {
@@ -110,7 +140,7 @@ export function editTransaction(files: FileMap, id: string, patch: Partial<Simpl
     next.lines = linesOf({ ...simpleOf(old), ...patch } as SimpleTx);
   }
   if (!isDate(next.date)) throw new ActionError("date must be yyyy-mm-dd");
-  return plan(files, { replaceTransactions: [next] }, `Edit: ${next.date} ${next.note ?? ""}`.trim());
+  return plan(files, { replaceTransactions: [trailed(next, "edit", meta)] }, withMeta(`Edit: ${next.date} ${next.note ?? ""}`.trim(), meta));
 }
 
 /** Best-effort simple view of a transaction (to let an edit change just one field). */
@@ -129,11 +159,11 @@ function simpleOf(t: Transaction): Partial<SimpleTx> {
   return { lines: t.lines };
 }
 
-export function voidTransaction(files: FileMap, id: string, reason?: string): Planned {
+export function voidTransaction(files: FileMap, id: string, reason?: string, meta?: WriteMeta): Planned {
   const old = findTx(files, id);
   if (old.void) throw new ActionError(`${id} is already void`);
   const next = { ...old, void: true, ...(reason ? { void_reason: reason } : {}) };
-  return plan(files, { replaceTransactions: [next] }, `Void: ${old.date} ${old.note ?? ""}`.trim());
+  return plan(files, { replaceTransactions: [trailed(next, "void", meta)] }, withMeta(`Void: ${old.date} ${old.note ?? ""}`.trim(), meta));
 }
 
 /** The ledger of a set of files, for actions that read it before building a change. */

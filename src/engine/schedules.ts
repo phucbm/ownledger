@@ -7,7 +7,7 @@ import { cards, type CardStatus } from "../modules/cards/engine.js";
 import { deposits, type DepositStatus } from "../modules/deposits/engine.js";
 import { plansDue, type DueItem } from "../modules/loans/engine.js";
 
-// Moved into their modules (plan 002); re-exported so the engine's API stays the same.
+// Moved into their modules (plan 003); re-exported so the engine's API stays the same.
 export * from "../modules/cards/engine.js";
 export * from "../modules/deposits/engine.js";
 export * from "../modules/loans/engine.js";

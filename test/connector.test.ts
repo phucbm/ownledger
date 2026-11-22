@@ -101,7 +101,7 @@ describe("connector: pool and cards", () => {
     const w = world();
     const rules = await w.call("rules");
     expect(rules.pool).toMatchObject({ on: true, default_account: "cash", accounts: ["cash", "momo"] });
-    const p = await w.call("add_transaction", { date: "2026-11-02", kind: "expense", amount: 50000, category: "food/cafe", note: "coffee" });
+    const p = await w.call("add_transaction", { date: "2026-11-02", kind: "expense", amount: 50000, category: "food/cafe", note: "coffee", reason: "ghi cafe" });
     expect(p.transactions[0].lines).toEqual([["cash", -50000], ["food/cafe", 50000]]);
   });
 
@@ -113,7 +113,7 @@ describe("connector: pool and cards", () => {
     const acc = (parseYaml(w.state.files["data/accounts.yaml"]!) as { id: string; details: Record<string, unknown> }[]).find((a) => a.id === "card")!;
     expect(acc.details).toMatchObject({ statement_day: 5, due_day: 25, limit: 20000000, cashback: { base: 1 } });
     const best = await w.call("best_card", { category: "food/cafe", amount: 100000, date: "2026-11-02" });
-    expect(best[0]).toMatchObject({ account: "card", rate: 5, earn: 5000 });
+    expect(best.cards[0]).toMatchObject({ account: "card", rate: 5, earn: 5000, source: "yours" });
   });
 });
 

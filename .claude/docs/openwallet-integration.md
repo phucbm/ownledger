@@ -1,6 +1,6 @@
 # OpenWallet as a card-terms source (idea, not planned yet)
 
-Written 2026-11-22. Status: idea. Not in plan 002; decide later whether it becomes its own plan.
+Written 2026-11-22. Status: superseded. Built differently in plan 002 (`002-20261122-cards-period-and-openwallet.md`, ownledger 1.2): the owner chose runtime lookups (OpenWallet's MCP, opt-in, sends card product names and the purchase), no OpenWallet ids stored. Merged with plan 003's `best_card`: the owner's own terms first, OpenWallet for cards without terms. Kept for the history of the idea.
 
 ## The split
 
@@ -17,7 +17,7 @@ Written 2026-11-22. Status: idea. Not in plan 002; decide later whether it becom
 
 - `details.openwallet_id` on a card account, matched once by name against the catalog (a previewed edit).
 - `set_card_details` pre-fills cashback rules, caps, minimum spend, interest-free days and fees from the catalog, as a preview for the owner's go. This replaces most of plan 002's card data checklist.
-- `bestCard` takes `merchant` / `mcc` as well as `category` (plan 002 defers MCC to a later plan; OpenWallet already has it).
+- `bestCard` takes `merchant` / `mcc` as well as `category` (plan 003 defers MCC to a later plan; OpenWallet already has it).
 - Ranking: cashback with the cap left and minimum spend this period → interest-free days from the owner's own statement date → limit left → 0% instalment when available.
 - Re-fetch on demand or weekly; show the catalog's `lastChecked` next to each suggestion. If the catalog and the owner's own entries differ, the owner's entries win and the difference is listed.
 

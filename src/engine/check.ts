@@ -153,6 +153,13 @@ export function checkLedger(l: Ledger): Issue[] {
       if (srcKeys.has(k)) err(file, w, `same import key as ${srcKeys.get(k)}`);
       srcKeys.set(k, t.id);
     }
+    if (t.trail !== undefined) {
+      if (!Array.isArray(t.trail)) err(file, w, "trail must be a list");
+      else
+        t.trail.forEach((e, j) => {
+          if (!e || typeof e !== "object" || typeof e.op !== "string" || typeof e.at !== "string" || typeof e.via !== "string") err(file, `${w} trail ${j + 1}`, "trail entry needs op, at and via");
+        });
+    }
     if (!Array.isArray(t.lines) || t.lines.length < 2) {
       err(file, w, "needs at least two lines");
       continue;

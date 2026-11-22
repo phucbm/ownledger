@@ -1,6 +1,6 @@
-# 002: A new dashboard: smart, personal, in Vietnamese and English
+# 003: A new dashboard: smart, personal, in Vietnamese and English
 
-Written: 2026-11-22. Status: In progress (run started 2026-11-22; direction approved by the owner on 2026-11-22: React + shadcn, rewrite of 002, widgets with drag-and-drop saved in the data repo, AI-built widgets, a module layer, the full Credit cards module)
+Written: 2026-11-22. Status: In progress (run started 2026-11-22; direction approved by the owner on 2026-11-22: React + shadcn, rewrite of 003, widgets with drag-and-drop saved in the data repo, AI-built widgets, a module layer, the full Credit cards module)
 Related: plan 001 (Phase 6 built the first dashboard), `assets/`, `src/worker/api.ts`, `src/worker/mcp.ts`
 
 ## Goal
@@ -108,7 +108,7 @@ One folder per module, `src/modules/<name>/`, with a manifest the core reads:
 
 ### Modules in this plan
 
-| Module | Types | In 002 |
+| Module | Types | In 003 |
 | --- | --- | --- |
 | **Cards** | `credit_card` accounts, plus a light list of debit and ATM cards | **complete, below** |
 | Deposits | `deposit`, `savings_goal` | ported at today's level (maturity, interest, countdown) |
@@ -650,6 +650,14 @@ The biggest pieces are step 3 (seven core engine functions), step 5 (the card mo
 
 ## Progress
 
+- 2026-11-22 Renumbered 002 → 003: plan 002 is now `002-20261122-cards-period-and-openwallet.md` (merged to main and
+  released as 1.2.0/1.2.1 while this branch was open). `main` merged into this branch: the cards module's `cards()`
+  gains `bank`, `product` and `period` (spent by category, refunds, cashback booked); the `cards` tool shows them;
+  `add_transaction` keeps the pool default and takes main's `reason`; **one `best_card`** (owner, 2026-11-22): the
+  owner's own cashback terms first (local), OpenWallet for cards without terms when the source is on, each row with
+  its `source`. 122 tests pass, build and size check pass (175.3 KB). Known: `today` still uses the engine's older
+  statement maths (to pay 62,000 on the demo card) while `cards` uses the module's statements (137,000: refunds and
+  cashback are not payments); align `today` with the module.
 - 2026-11-22 Steps 1–9 built in one run (nothing committed, published or deployed). 89 tests pass (engine, cards, connector, API, i18n), typecheck clean, first-load JS 170.7 KB gzipped, MCP smoke with writes passes on a demo copy, `/api/home` 0.09 s on the `my-money` data. UI not yet seen in a browser.
   - Step 1: `web/` (React 19, Vite 8, Tailwind 4, shadcn nova/neutral, TanStack Query, own hash router in `lib/hash.ts` because wouter's broke `#/x?…` links). `assets/` is build output, git-ignored. No eslint (typescript-eslint doesn't run on TypeScript 7): the i18n test fails on literal text in JSX instead.
   - Step 2: `src/modules/` (cards, loans, deposits, investments, insurance) with `ModuleDef` (types, on, load, check, attention) and `/api/m/<module>/…`; `cards()`, plans and deposits moved with no change in numbers. YAML writer: block style, flow-special values quoted; the mapping check refuses a name cut at a comma.
@@ -657,7 +665,7 @@ The biggest pieces are step 3 (seven core engine functions), step 5 (the card mo
   - Steps 4–7: Home grid with every built-in widget, Transactions, Cards pages and widgets, Accounts, Reports, Plans, Import, Settings (pool settings), edit mode, catalogue, chart form, Pin to Home.
   - Step 5 data: `data/cards.yaml`, `data/cards/statements.yaml`, card terms in `details` (`from_name` marks keys read from wallet names, per key, rather than one `source: misa-name` flag, so an owner-set key is never overwritten), `ownledger cards load <csv>` with `--link`, `--closed`, `--as-debit` for the owner's answers. Codes in MISA names read on every import (8 of the owner's cards).
   - Step 8: connector `dashboard`, `add_widget`, `edit_widget`, `remove_widget`, plus card tools and the pool in `rules` / `add_transaction`.
-  - Step 9: `.claude/docs/002-vietnamese-copy.md` for the owner's review.
+  - Step 9: `.claude/docs/003-vietnamese-copy.md` for the owner's review.
 - Waiting for the owner: review on `localhost:8787`; the `my-money` data changes (the two cut names, the card tracker load and its mismatch answers, KBank's closing day); the Vietnamese list; then step 10 (release 2.0.0) on their go.
 - 2026-11-22 Browser check (owner allowed) on `localhost:8787` with the `my-money` data, desktop, vi and en: Home, edit mode and catalogue, Transactions, Accounts, Cards, one card, Reports, Settings. Fixed: 12 untranslated card "Needs you" kinds, "tháng 11" case, chart axis width, "Hôm Qua"/"21-11" day headers, Reports headline number, the default-account label; added a reload when a tab from an old build asks for page files that no longer exist. Phone size not checked (the Chrome window couldn't be resized).
 - 2026-11-22 `my-money` (local commits, not pushed): c97ddd8 the two cut names quoted; 6fc3244 card tracker loaded (Woori VV Hype Point = woori-gold, UOB Cashback = uob-one, Lio a debit card, KBank closed 2026-05-31 as an estimate).
