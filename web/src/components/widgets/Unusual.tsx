@@ -10,15 +10,15 @@ function useRow(c: UnusualCard): { icon: LucideIcon; iconLabel: string; label: s
   const { t } = useI18n();
   switch (c.kind) {
     case "category_up":
-      return { icon: ArrowUp, iconLabel: t("delta.up"), label: c.name, amount: c.current, meta: t("unusual.vsUsual", { pct: `+${Math.round(c.changePct)}` }), tone: "text-red-700" };
+      return { icon: ArrowUp, iconLabel: t("delta.up"), label: c.name, amount: c.current, meta: t("unusual.vsUsual", { pct: `+${Math.round(c.changePct)}` }), tone: "text-critical" };
     case "category_down":
-      return { icon: ArrowDown, iconLabel: t("delta.down"), label: c.name, amount: c.current, meta: t("unusual.vsUsual", { pct: `${Math.round(c.changePct)}`.replace("-", "−") }), tone: "text-emerald-700" };
+      return { icon: ArrowDown, iconLabel: t("delta.down"), label: c.name, amount: c.current, meta: t("unusual.vsUsual", { pct: `${Math.round(c.changePct)}`.replace("-", "−") }), tone: "text-positive" };
     case "new_category":
       return { icon: Sparkles, iconLabel: t("unusual.new"), label: t("unusual.new_category", { name: c.name }), amount: c.amount, meta: null, tone: "text-foreground" };
     case "new_who":
       return { icon: Sparkles, iconLabel: t("unusual.new"), label: t("unusual.new_who", { who: c.who }), amount: c.amount, meta: t("unusual.times", { n: c.count }), tone: "text-foreground" };
     case "large":
-      return { icon: TriangleAlert, iconLabel: t("unusual.large"), label: t("unusual.large_label", { name: c.note || c.name }), amount: c.amount, meta: null, tone: "text-amber-700" };
+      return { icon: TriangleAlert, iconLabel: t("unusual.large"), label: t("unusual.large_label", { name: c.note || c.name }), amount: c.amount, meta: null, tone: "text-warning" };
   }
 }
 

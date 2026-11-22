@@ -66,7 +66,7 @@ export default function Upcoming({ widget, menu }: WidgetProps) {
             <a href={it.href} className="flex min-h-11 items-center gap-2 rounded-md py-1 outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50">
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="truncate text-sm">{it.name}</span>
-                <span className={cn("text-xs", it.overdue ? "text-red-700" : "text-muted-foreground")}>{it.overdue ? t("upcoming.overdue", { date: dayMonth(it.date) }) : dayMonth(it.date)}</span>
+                <span className={cn("text-xs", it.overdue ? "text-critical" : "text-muted-foreground")}>{it.overdue ? t("upcoming.overdue", { date: dayMonth(it.date) }) : dayMonth(it.date)}</span>
               </span>
               <Money amount={it.amount} mode="short" className="shrink-0 text-sm font-medium" />
             </a>

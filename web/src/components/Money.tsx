@@ -6,8 +6,8 @@ import { cn } from "@/lib/utils";
 export type MoneyTone = "auto" | "in" | "out" | "transfer" | "none";
 
 const toneClass: Record<Exclude<MoneyTone, "auto" | "none">, string> = {
-  in: "text-emerald-700",
-  out: "text-red-700",
+  in: "text-positive",
+  out: "text-critical",
   transfer: "text-muted-foreground",
 };
 

@@ -28,7 +28,7 @@ function DueRow({ d, overdue }: { d: PlanDue; overdue?: boolean }) {
     <li className="flex min-h-12 items-center gap-3 py-1.5">
       <span className="flex min-w-0 flex-1 flex-col">
         <DrillLink filter={{ plan: d.plan }} className="truncate text-sm font-medium">{d.name}</DrillLink>
-        <span className={cn("text-xs", overdue ? "font-medium text-red-700" : "text-muted-foreground")}>
+        <span className={cn("text-xs", overdue ? "font-medium text-critical" : "text-muted-foreground")}>
           {overdue ? t("upcoming.overdue", { date: dayMonth(d.date) }) : formatDate(d.date, lang, { weekday: "short", day: "2-digit", month: "2-digit" })}
         </span>
       </span>
@@ -42,7 +42,7 @@ function PlanProgress({ p }: { p: PlanStatus }) {
   const { t } = useI18n();
   const late = p.overdue.length > 0;
   let tail: ReactNode = null;
-  if (late) tail = <span className="font-medium text-red-700">{t("plans.lateCount", { n: p.overdue.length })}</span>;
+  if (late) tail = <span className="font-medium text-critical">{t("plans.lateCount", { n: p.overdue.length })}</span>;
   else if (p.next) tail = <span>{t("plans.next", { date: dayMonth(p.next) })}</span>;
   return (
     <li className="flex flex-col gap-1 py-2">
@@ -96,7 +96,7 @@ export default function Plans() {
         {data ? (
           <p className="text-sm text-muted-foreground">
             {t("upcoming.total")} <Money amount={model.total} mode="short" className="font-medium text-foreground" />
-            {model.overdue.length > 0 && <> · <span className="font-medium text-red-700">{t("plans.overdueTotal", { n: model.overdue.length })} <Money amount={model.overdueTotal} mode="short" /></span></>}
+            {model.overdue.length > 0 && <> · <span className="font-medium text-critical">{t("plans.overdueTotal", { n: model.overdue.length })} <Money amount={model.overdueTotal} mode="short" /></span></>}
           </p>
         ) : (
           <Skeleton className="h-5 w-64" />
@@ -118,7 +118,7 @@ export default function Plans() {
       ) : (
         <>
           {model.overdue.length > 0 && (
-            <Panel title={t("plans.overdue")} className="ring-red-200">
+            <Panel title={t("plans.overdue")} className="ring-critical/30">
               <ul className="flex flex-col divide-y">{model.overdue.map((d) => <DueRow key={`${d.plan}-${d.date}`} d={d} overdue />)}</ul>
             </Panel>
           )}

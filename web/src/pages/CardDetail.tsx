@@ -79,7 +79,7 @@ function LastStatement({ s, id, asOf }: { s: CardStatement | null; id: string; a
           {s.bank !== null && (
             <KV label={t("cards.bankAmount")}>
               <Money amount={s.bank} />
-              {s.bankDiff !== null && s.bankDiff !== 0 && <span className="block text-xs text-amber-700">{t("cards.bankDiff", { amount: `${s.bankDiff > 0 ? "+" : "−"}${formatNumber(Math.abs(s.bankDiff), lang)}` })}</span>}
+              {s.bankDiff !== null && s.bankDiff !== 0 && <span className="block text-xs text-warning">{t("cards.bankDiff", { amount: `${s.bankDiff > 0 ? "+" : "−"}${formatNumber(Math.abs(s.bankDiff), lang)}` })}</span>}
             </KV>
           )}
         </dl>
@@ -139,7 +139,7 @@ function Cashback({ d }: { d: Detail }) {
       {cur && (
         <dl className="divide-y">
           <KV label={t("cards.spendThisPeriod")}><DrillLink filter={{ account: d.account.id, from: cur.from, to: cur.close }}><Money amount={cur.spend} /></DrillLink></KV>
-          <KV label={t("cards.expected")}>{cur.incomplete ? <span className="text-amber-700">{t("cards.rateNotSet")}</span> : <Money amount={cur.expected} className="font-medium" />}</KV>
+          <KV label={t("cards.expected")}>{cur.incomplete ? <span className="text-warning">{t("cards.rateNotSet")}</span> : <Money amount={cur.expected} className="font-medium" />}</KV>
           {cur.cap !== null && cur.capLeft !== null && <KV label={t("cards.capLeftLabel")}><Money amount={cur.capLeft} /> <span className="text-muted-foreground">/ <Money amount={cur.cap} mode="short" /></span></KV>}
         </dl>
       )}
@@ -191,7 +191,7 @@ function FeeWaiver({ d, asOf }: { d: Detail; asOf: string }) {
             {!f.met && <KV label={t("cards.perMonth")}><Money amount={f.perMonth} /></KV>}
             {d.terms.annualFee ? <KV label={t("cards.annualFee")}><Money amount={d.terms.annualFee} /></KV> : null}
           </dl>
-          <p className={cn("text-sm font-medium", f.met || f.onTrack ? "text-foreground" : "text-red-700")}>{f.met ? t("cards.feeMet") : f.onTrack ? t("cards.onTrack") : t("cards.behind")}</p>
+          <p className={cn("text-sm font-medium", f.met || f.onTrack ? "text-foreground" : "text-critical")}>{f.met ? t("cards.feeMet") : f.onTrack ? t("cards.onTrack") : t("cards.behind")}</p>
         </>
       ) : (
         <dl>

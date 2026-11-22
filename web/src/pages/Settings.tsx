@@ -139,7 +139,7 @@ function PoolSettings({ me }: { me: Me }) {
         </Button>
         <span aria-live="polite" className="text-sm">
           {save.isSuccess && !dirty && <span className="flex items-center gap-1 text-muted-foreground"><Check className="size-4" aria-hidden />{t("settings.saved")}</span>}
-          {save.isError && <span role="alert" className="font-medium text-red-700">{t("common.error", { message: save.error.message })}</span>}
+          {save.isError && <span role="alert" className="font-medium text-critical">{t("common.error", { message: save.error.message })}</span>}
         </span>
       </div>
     </Panel>
@@ -203,7 +203,7 @@ function ResetDashboard() {
         <ConfirmButton label={t("settings.reset")} confirmLabel={t("settings.resetConfirm")} pending={reset.isPending} onConfirm={() => reset.mutate()} />
         <span aria-live="polite" className="text-sm">
           {reset.isSuccess && <span className="flex items-center gap-1 text-muted-foreground"><Check className="size-4" aria-hidden />{t("settings.resetDone")}</span>}
-          {reset.isError && <span role="alert" className="font-medium text-red-700">{t("common.error", { message: reset.error.message })}</span>}
+          {reset.isError && <span role="alert" className="font-medium text-critical">{t("common.error", { message: reset.error.message })}</span>}
         </span>
       </div>
     </Panel>
@@ -240,7 +240,7 @@ function Apps() {
           ))}
         </ul>
       )}
-      {revoke.isError && <p role="alert" className="text-sm font-medium text-red-700">{t("common.error", { message: revoke.error.message })}</p>}
+      {revoke.isError && <p role="alert" className="text-sm font-medium text-critical">{t("common.error", { message: revoke.error.message })}</p>}
     </Panel>
   );
 }
@@ -273,7 +273,7 @@ export default function Settings() {
           <KV label={t("settings.repo")}>{me.data}</KV>
           <KV label={t("settings.commit")}><span className="font-mono">{me.commit.slice(0, 10)}</span></KV>
           <KV label={t("settings.checkLabel")}>
-            <span className={cn(bad && "font-medium text-red-700")}>{t("settings.check", { errors: me.check.errors, warnings: me.check.warnings })}</span>
+            <span className={cn(bad && "font-medium text-critical")}>{t("settings.check", { errors: me.check.errors, warnings: me.check.warnings })}</span>
           </KV>
           <KV label={t("settings.versionLabel")}>{me.version}</KV>
         </dl>

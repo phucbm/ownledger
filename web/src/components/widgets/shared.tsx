@@ -23,7 +23,7 @@ export function Delta({ pct, goodWhenDown = true, className }: { pct: number; go
   const good = up !== goodWhenDown;
   const Icon = up ? ArrowUp : ArrowDown;
   return (
-    <span className={cn("inline-flex items-center gap-0.5 whitespace-nowrap text-sm font-medium tabular-nums", pct === 0 ? "text-muted-foreground" : good ? "text-emerald-700" : "text-red-700", className)}>
+    <span className={cn("inline-flex items-center gap-0.5 whitespace-nowrap text-sm font-medium tabular-nums", pct === 0 ? "text-muted-foreground" : good ? "text-positive" : "text-critical", className)}>
       {pct !== 0 && <Icon className="size-3.5" aria-hidden />}
       <span className="sr-only">{up ? t("delta.up") : pct < 0 ? t("delta.down") : ""}</span>
       {Math.abs(Math.round(pct))}%

@@ -21,14 +21,14 @@ export function MobileTabBar({ login, features }: { login: string; features: Fea
   return (
     <nav aria-label={t("nav.main")} className="fixed inset-x-0 bottom-0 z-40 flex border-t bg-background pb-[env(safe-area-inset-bottom)] md:hidden">
       {tabs.map((item) => (
-        <Link key={item.id} href={item.path} className={cn(tabClass, isActive(item, location) && "font-medium text-foreground")} aria-current={isActive(item, location) ? "page" : undefined}>
+        <Link key={item.id} href={item.path} className={cn(tabClass, isActive(item, location) && "font-medium text-primary")} aria-current={isActive(item, location) ? "page" : undefined}>
           <item.icon />
           <span>{t(item.labelKey)}</span>
         </Link>
       ))}
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
-          <button type="button" className={cn(tabClass, moreActive && "font-medium text-foreground")}>
+          <button type="button" className={cn(tabClass, moreActive && "font-medium text-primary")}>
             <Menu />
             <span>{t("nav.more")}</span>
           </button>

@@ -6,6 +6,9 @@ import { SignOut } from "@/components/SignOut";
 import { useI18n } from "@/i18n";
 import { isActive, mainNav, settingsNav, visible, type Features } from "@/nav";
 
+/** Hover stays grey; only the page you are on wears the accent. */
+const activeCls = "data-active:bg-primary/10 data-active:text-primary dark:data-active:bg-primary/15";
+
 export function DesktopSidebar({ login, features }: { login: string; features: Features }) {
   const { t } = useI18n();
   const [location] = useLocation();
@@ -13,7 +16,8 @@ export function DesktopSidebar({ login, features }: { login: string; features: F
   return (
     <Sidebar collapsible="none" className="h-svh border-r">
       <SidebarHeader className="px-4 py-4">
-        <Link href="/" className="text-lg font-semibold tracking-tight">
+        <Link href="/" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
+          <span aria-hidden className="size-2.5 rounded-full bg-primary" />
           {t("app.name")}
         </Link>
       </SidebarHeader>
@@ -22,7 +26,7 @@ export function DesktopSidebar({ login, features }: { login: string; features: F
           <SidebarMenu aria-label={t("nav.main")}>
             {visible(mainNav, features).map((item) => (
               <SidebarMenuItem key={item.id}>
-                <SidebarMenuButton asChild isActive={isActive(item, location)}>
+                <SidebarMenuButton asChild isActive={isActive(item, location)} className={activeCls}>
                   <Link href={item.path}>
                     <item.icon />
                     <span>{t(item.labelKey)}</span>
@@ -38,7 +42,7 @@ export function DesktopSidebar({ login, features }: { login: string; features: F
         <LangSwitch className="self-start" />
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild isActive={settingsActive}>
+            <SidebarMenuButton asChild isActive={settingsActive} className={activeCls}>
               <Link href={settingsNav.path}>
                 <settingsNav.icon />
                 <span>{t(settingsNav.labelKey)}</span>

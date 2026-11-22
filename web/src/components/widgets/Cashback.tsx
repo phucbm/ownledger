@@ -27,7 +27,7 @@ export default function Cashback({ widget, menu }: WidgetProps) {
             <li key={c.account} className="flex flex-col gap-1 py-2">
               <div className="flex items-baseline justify-between gap-2">
                 <a href={cardHref(c.account)} className="min-w-0 truncate rounded-md text-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">{c.name}</a>
-                {cb.incomplete ? <span className="shrink-0 text-xs text-amber-700">{t("cards.rateNotSet")}</span> : <Money amount={cb.expected} mode="short" className="shrink-0 text-sm font-medium" />}
+                {cb.incomplete ? <span className="shrink-0 text-xs text-warning">{t("cards.rateNotSet")}</span> : <Money amount={cb.expected} mode="short" className="shrink-0 text-sm font-medium" />}
               </div>
               {cb.cap !== null && (
                 <>

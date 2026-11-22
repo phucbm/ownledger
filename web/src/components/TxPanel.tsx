@@ -40,7 +40,7 @@ export function TxPanel({ tx, names, onClose, account }: { tx: Tx | null; names:
                 </div>
               </div>
               <Money amount={v.amount} tone={v.kind === "transfer" ? "transfer" : "auto"} className="text-2xl font-semibold" />
-              {tx.void && <p className="text-sm text-red-700">{t("tx.void")}</p>}
+              {tx.void && <p className="text-sm text-critical">{t("tx.void")}</p>}
             </SheetHeader>
             <div className="flex flex-col gap-4 px-4 pb-4">
               <section aria-label={t("tx.lines")}>

@@ -1,3 +1,4 @@
+import { CircleAlert, Clock, Info, type LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { AskAI } from "@/components/AskAI";
 import { Money } from "@/components/Money";
@@ -13,7 +14,12 @@ import { useWidgetTitle, type WidgetProps } from "./shared";
 
 const COLLAPSED = 5;
 
-const dot: Record<AttentionItem["severity"], string> = { red: "bg-red-600", amber: "bg-amber-500", info: "bg-muted-foreground/50" };
+/** Severity shows as an icon (shape differs, so colour is never the only cue), the label is there for screen readers. */
+const sev: Record<AttentionItem["severity"], { icon: LucideIcon; cls: string; row?: string }> = {
+  red: { icon: CircleAlert, cls: "text-critical", row: "bg-critical/5" },
+  amber: { icon: Clock, cls: "text-warning" },
+  info: { icon: Info, cls: "text-muted-foreground" },
+};
 
 /** Text for one item: by kind and params. An unknown kind (a newer server) falls back to the English title. */
 export function attentionLabel(item: AttentionItem, lang: "vi" | "en"): string {
@@ -59,7 +65,7 @@ export default function Attention({ widget, menu }: WidgetProps) {
       title={
         <span className="flex items-center gap-2">
           {title}
-          {items.length > 0 && <span className="rounded-full bg-secondary px-2 py-0.5 text-xs tabular-nums text-secondary-foreground">{items.length}</span>}
+          {items.length > 0 && <span className={cn("rounded-full px-2 py-0.5 text-xs font-medium tabular-nums", items.some((x) => x.severity === "red") ? "bg-critical/10 text-critical" : "bg-secondary text-secondary-foreground")}>{items.length}</span>}
         </span>
       }
       menu={menu}
@@ -67,13 +73,15 @@ export default function Attention({ widget, menu }: WidgetProps) {
       error={error?.message}
       empty={data && items.length === 0 ? t("attention.empty") : undefined}
     >
-      <ul className="flex flex-col divide-y">
+      <ul className="flex flex-col gap-0.5">
         {shown.map((it, i) => {
           const when = whenText(it, t);
           const label = attentionLabel(it, lang);
+          const s = sev[it.severity];
+          const SevIcon = s.icon;
           const body = (
             <>
-              <span className="mt-1.5 flex shrink-0 items-center"><span className={cn("size-2.5 rounded-full", dot[it.severity])} aria-hidden /><span className="sr-only">{t(`attention.sev.${it.severity}`)}</span></span>
+              <span className="mt-0.5 flex shrink-0 items-center"><SevIcon className={cn("size-4", s.cls)} aria-hidden /><span className="sr-only">{t(`attention.sev.${it.severity}`)}</span></span>
               <span className="flex min-w-0 flex-1 flex-col">
                 <span className="text-sm">{label}</span>
                 <span className="text-xs text-muted-foreground">{[when, !when || it.days === undefined ? null : dayMonth(it.date)].filter(Boolean).join(" · ")}</span>
@@ -82,7 +90,7 @@ export default function Attention({ widget, menu }: WidgetProps) {
             </>
           );
           return (
-            <li key={`${it.kind}-${i}`} className="flex flex-wrap items-center gap-x-2 gap-y-1 py-1.5">
+            <li key={`${it.kind}-${i}`} className={cn("-mx-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg px-2 py-1.5", s.row)}>
               {it.link ? (
                 <a href={it.link.startsWith("#") ? it.link : drillHref()} className="flex min-h-11 min-w-0 flex-1 items-start gap-2 rounded-md py-1 outline-none hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-ring/50">
                   {body}

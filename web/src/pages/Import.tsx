@@ -43,7 +43,7 @@ function Report({ r }: { r: ImportReport }) {
   );
   return (
     <div className="flex flex-col gap-3">
-      <p className={cn("flex items-center gap-2 text-base font-semibold", r.ok ? "text-foreground" : "text-red-700")}>
+      <p className={cn("flex items-center gap-2 text-base font-semibold", r.ok ? "text-foreground" : "text-critical")}>
         {r.ok ? <Check className="size-5" aria-hidden /> : <AlertTriangle className="size-5" aria-hidden />}
         {r.ok ? t("import.reconciles") : t("import.refused")}
       </p>
@@ -66,7 +66,7 @@ function Report({ r }: { r: ImportReport }) {
         </Fold>
       )}
       {r.unresolvedCategories.length > 0 && (
-        <Fold open summary={<span className="text-red-700">{t("import.unresolvedCategories", { n: r.unresolvedCategories.length })}</span>}>
+        <Fold open summary={<span className="text-critical">{t("import.unresolvedCategories", { n: r.unresolvedCategories.length })}</span>}>
           <ul className="flex flex-col gap-1 text-xs">
             {r.unresolvedCategories.map((u) => <li key={u.key}><span className="font-medium">{u.key}</span> ({t("import.rowsCount", { n: u.rows })}) <span className="text-muted-foreground">{u.example}</span></li>)}
           </ul>
@@ -83,7 +83,7 @@ function Report({ r }: { r: ImportReport }) {
         </Fold>
       )}
       {(r.changed.length > 0 || r.gone.length > 0) && (
-        <p className="flex items-start gap-2 text-sm font-medium text-red-700"><AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />{t("import.changedGone", { changed: r.changed.length, gone: r.gone.length })}</p>
+        <p className="flex items-start gap-2 text-sm font-medium text-critical"><AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />{t("import.changedGone", { changed: r.changed.length, gone: r.gone.length })}</p>
       )}
       {r.rounding.length > 0 && <p className="text-xs text-muted-foreground">{t("import.rounding", { n: r.rounding.length })}</p>}
       {r.zeroed.length > 0 && <p className="text-xs text-muted-foreground">{t("import.zeroed", { n: r.zeroed.length })}</p>}
@@ -93,12 +93,12 @@ function Report({ r }: { r: ImportReport }) {
         </Fold>
       )}
       {r.nameWarnings.length > 0 && (
-        <Fold open summary={<span className="text-amber-700">{t("import.nameWarnings", { n: r.nameWarnings.length })}</span>}>
+        <Fold open summary={<span className="text-warning">{t("import.nameWarnings", { n: r.nameWarnings.length })}</span>}>
           <ul className="flex list-disc flex-col gap-1 pl-5 text-xs">{r.nameWarnings.map((w, i) => <li key={i}>{w}</li>)}</ul>
         </Fold>
       )}
       {r.errors.length > 0 && (
-        <Fold open summary={<span className="text-red-700">{t("import.errors", { n: r.errors.length })}</span>}>
+        <Fold open summary={<span className="text-critical">{t("import.errors", { n: r.errors.length })}</span>}>
           <pre className="overflow-x-auto text-xs whitespace-pre-wrap">{r.errors.join("\n")}</pre>
         </Fold>
       )}
@@ -205,7 +205,7 @@ export default function Import() {
         </Panel>
       )}
 
-      {preview.error && <p role="alert" className="text-sm font-medium text-red-700">{t("common.error", { message: preview.error.message })}</p>}
+      {preview.error && <p role="alert" className="text-sm font-medium text-critical">{t("common.error", { message: preview.error.message })}</p>}
 
       {p && (
         <Panel title={t("import.result")}>
@@ -222,7 +222,7 @@ export default function Import() {
                   {p.message && <p className="text-xs text-muted-foreground">{p.message}</p>}
                 </>
               )}
-              {apply.error && <p role="alert" className="text-sm font-medium text-red-700">{t("common.error", { message: apply.error.message })}</p>}
+              {apply.error && <p role="alert" className="text-sm font-medium text-critical">{t("common.error", { message: apply.error.message })}</p>}
             </div>
           ) : (
             p.report.ok && <p className="border-t pt-3 text-sm text-muted-foreground">{t("import.nothingNew")}</p>

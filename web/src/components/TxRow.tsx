@@ -5,7 +5,7 @@ import { useI18n } from "@/i18n";
 import type { Tx } from "@/lib/types";
 import { viewTx, type TxNames } from "@/lib/tx";
 
-/** One transaction in the feed style: icon, category (or Transfer), note and who underneath, amount right. */
+/** One transaction in the feed style: icon, category (or Transfer), note and who underneath, amount right. Money in is green with +; spending stays ink (it is normal, not an alarm). */
 export function TxRow({ tx, names, account, onOpen, selected, balance, showBalance, className }: { tx: Tx; names: TxNames; account?: string; onOpen?: () => void; selected?: boolean; balance?: number | null; showBalance?: boolean; className?: string }) {
   const { t } = useI18n();
   const v = viewTx(tx, names, account);
@@ -19,7 +19,7 @@ export function TxRow({ tx, names, account, onOpen, selected, balance, showBalan
         {under && <span className="truncate text-xs text-muted-foreground">{under}</span>}
       </span>
       <span className="flex shrink-0 flex-col items-end">
-        <Money amount={v.amount} tone={v.kind === "transfer" ? "transfer" : "auto"} className="text-sm font-medium" />
+        <Money amount={v.amount} tone={v.kind === "transfer" ? "transfer" : v.amount > 0 ? "in" : "none"} plus className="text-sm font-medium" />
         {showBalance && balance != null && <Money amount={balance} className="text-xs text-muted-foreground" />}
       </span>
     </>

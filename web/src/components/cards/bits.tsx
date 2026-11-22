@@ -15,7 +15,7 @@ type Translate = ReturnType<typeof useI18n>["t"];
 export function UsedBar({ owed, limit, atLeast, className }: { owed: number; limit: number | null; atLeast?: number | null; className?: string }) {
   const { t, lang } = useI18n();
   const ratio = limit ? Math.min(1, Math.max(0, owed / limit)) : 0;
-  const tone = limit && owed / limit >= 1 ? "bg-red-600" : limit && owed / limit >= 0.8 ? "bg-amber-600" : "bg-[var(--chart-1)]";
+  const tone = limit && owed / limit >= 1 ? "bg-critical" : limit && owed / limit >= 0.8 ? "bg-warning" : "bg-[var(--chart-1)]";
   return (
     <div className={cn("flex flex-col gap-1", className)}>
       {limit ? (
@@ -42,7 +42,7 @@ export function DaysLeft({ days, className }: { days: number | null; className?:
   const { t } = useI18n();
   if (days === null) return null;
   const text = days < 0 ? t("cards.overdueDays", { n: -days }) : days === 0 ? t("cards.dueToday") : t("cards.daysLeft", { n: days });
-  return <span className={cn("whitespace-nowrap text-xs font-medium tabular-nums", days <= 3 ? "text-red-700" : days <= 7 ? "text-amber-700" : "text-muted-foreground", className)}>{text}</span>;
+  return <span className={cn("whitespace-nowrap text-xs font-medium tabular-nums", days <= 3 ? "text-critical" : days <= 7 ? "text-warning" : "text-muted-foreground", className)}>{text}</span>;
 }
 
 /** The state of the last statement: paid in full or not. */
@@ -50,7 +50,7 @@ export function StatementStatus({ status, className }: { status: string; classNa
   const { t } = useI18n();
   const bad = status === "late" || status === "partly" || status === "unpaid";
   return (
-    <span className={cn("inline-flex items-center gap-1 text-xs", bad ? "font-medium text-red-700" : status === "due" ? "font-medium text-amber-700" : "text-muted-foreground", className)}>
+    <span className={cn("inline-flex items-center gap-1 text-xs", bad ? "font-medium text-critical" : status === "due" ? "font-medium text-warning" : "text-muted-foreground", className)}>
       {status === "paid" && <Check className="size-3.5" aria-hidden />}
       {t(`cards.st.${status}`)}
     </span>
