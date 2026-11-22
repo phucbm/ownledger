@@ -1,6 +1,6 @@
 {
   "name": "ownledger",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Personal finance ledger used through AI chat (MCP). Your data in your own private GitHub repo, served by your own Cloudflare Worker.",
   "license": "MIT",
   "author": "phucbm",
@@ -46,7 +46,8 @@
     "build": "node scripts/version.mjs && rm -rf dist && tsc -p tsconfig.build.json && chmod +x dist/cli/index.js",
     "typecheck": "node scripts/version.mjs && tsc --noEmit",
     "test": "vitest run",
-    "fixtures": "tsx scripts/make-fixtures.ts && tsx scripts/make-misa-fixture.ts"
+    "fixtures": "tsx scripts/make-fixtures.ts && tsx scripts/make-misa-fixture.ts",
+    "prepublishOnly": "pnpm typecheck && pnpm test && pnpm build"
   },
   "dependencies": {
     "@cloudflare/workers-oauth-provider": "1.2.4",
