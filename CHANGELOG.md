@@ -6,6 +6,8 @@
   (`period`), plus `bank` and `product` from the card's details. `all: true` lists every open card, also those
   with nothing owed.
 - New optional card detail `product`: the bank's own name for the card.
+- Question evals (`evals/questions.md`): the owner's questions, the tool calls that answer them and the facts that
+  must come back, plus guards (no invented account, category, date or amount; writes only preview). Run in `pnpm test`.
 
 ## 1.1.0 (2026-11-22)
 
