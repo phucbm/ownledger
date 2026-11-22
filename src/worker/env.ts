@@ -25,6 +25,8 @@ export interface Env {
 
 export interface Props {
   login: string;
+  /** The connected app's name (from its OAuth registration), recorded on writes. Missing on tokens issued before 1.1.0. */
+  client?: string;
 }
 
 export function allowed(env: Env, login: string): boolean {

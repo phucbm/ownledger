@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.0 (unreleased)
+
+- Transactions record where they came from: `trail` gets one entry per add/edit/void made through the MCP
+  connector (`op`, `at`, `via`, `client`, `reason`). Imports keep `src`; rows without a trail are unchanged.
+- `add_transaction`, `edit_transaction` and `void_transaction` now require `reason`: one line saying what the
+  owner asked for. It is shown in the preview, kept on the trail and added to the commit message
+  (`Reason: …` / `Via: mcp (<app>)`).
+- The connected app's name is saved at sign-in and recorded on writes. Reconnect an app once to get it.
+- `check` refuses a malformed `trail`.
+
 ## 1.0.0 (2026-11-22)
 
 First release.

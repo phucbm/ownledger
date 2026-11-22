@@ -37,6 +37,7 @@ amounts, and never write without the owner's go. `npx ownledger check` must pass
 - `void: true` hides a transaction but keeps it in history. Don't delete lines from ledger files.
 - `plan: "<plan id>"` marks a payment of an instalment, loan or premium.
 - `src: {import, key}` ties an imported transaction to its source row. Never change it.
+- `trail: [{op, at, via, client?, reason?}]` records each add/edit/void made through a connector (who, when, why). Append only; never edit or remove entries.
 
 ## Account types
 

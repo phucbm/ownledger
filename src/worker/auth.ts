@@ -83,6 +83,13 @@ export async function sessionLogin(req: Request, env: Env): Promise<string | nul
 
 /* ------------------------------------------------------------------ MCP client authorization (/authorize) */
 
+/** The registered app's name, kept in the token props so writes can say which app made them. */
+async function clientName(oauth: Env["OAUTH_PROVIDER"], clientId: string): Promise<{ client?: string }> {
+  const c = await oauth.lookupClient(clientId).catch(() => null);
+  const name = (c?.clientName || clientId || "").slice(0, 60);
+  return name ? { client: name } : {};
+}
+
 export async function authorizeGet(req: Request, env: Env): Promise<Response> {
   const oauth = env.OAUTH_PROVIDER;
   let request;
@@ -117,7 +124,7 @@ export async function authorizePost(req: Request, env: Env): Promise<Response> {
     }
     const approved = await oauth.approveConsent(req, handle);
     if (env.DEV_LOGIN) {
-      const { redirectTo } = await oauth.completeAuthorization({ request: approved.request, userId: env.DEV_LOGIN, metadata: { login: env.DEV_LOGIN }, scope: approved.request.scope, props: { login: env.DEV_LOGIN } });
+      const { redirectTo } = await oauth.completeAuthorization({ request: approved.request, userId: env.DEV_LOGIN, metadata: { login: env.DEV_LOGIN }, scope: approved.request.scope, props: { login: env.DEV_LOGIN, ...(await clientName(oauth, approved.request.clientId)) } });
       approved.headers.set("Location", redirectTo);
       return new Response(null, { status: 302, headers: approved.headers });
     }
@@ -148,7 +155,7 @@ export async function oauthCallback(req: Request, env: Env): Promise<Response> {
   if (url.searchParams.get("error")) return deny("GitHub sign-in was declined");
   const login = await githubLogin(env.GITHUB_CLIENT_ID, env.GITHUB_CLIENT_SECRET, url.searchParams.get("code") ?? "", resumed.data.verifier, new URL("/oauth/callback", req.url).toString());
   if (!allowed(env, login)) return deny(`${login} is not allowed on this ledger`);
-  const { redirectTo } = await oauth.completeAuthorization({ request: resumed.request, userId: login, metadata: { login }, scope: resumed.request.scope, props: { login } });
+  const { redirectTo } = await oauth.completeAuthorization({ request: resumed.request, userId: login, metadata: { login }, scope: resumed.request.scope, props: { login, ...(await clientName(oauth, resumed.request.clientId)) } });
   resumed.headers.set("Location", redirectTo);
   return new Response(null, { status: 302, headers: resumed.headers });
 }

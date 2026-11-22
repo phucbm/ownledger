@@ -33,6 +33,7 @@ function compactTx(t: Transaction) {
     ...(t.tags?.length ? { tags: t.tags } : {}),
     ...(t.plan ? { plan: t.plan } : {}),
     ...(t.void ? { void: true } : {}),
+    ...(t.trail?.length ? { reason: t.trail[t.trail.length - 1]!.reason } : {}),
     lines: t.lines.map((l) => [l.account ?? l.category, l.amount, ...(l.qty !== undefined ? [`${l.qty} ${l.asset ?? ""}`.trim()] : [])]),
   };
 }
@@ -61,12 +62,20 @@ const txFields = {
   plan: z.string().optional().describe("plan id this pays (instalment, loan, premium)"),
 };
 
+const reason = z
+  .string()
+  .trim()
+  .min(3)
+  .max(A.REASON_MAX)
+  .describe("Required. One line: what the owner asked for, close to their own words (kept on the transaction's trail and in the commit).");
+
 export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(env)): McpServer {
   const server = new McpServer({ name: "ownledger", version: VERSION }, { instructions: INSTRUCTIONS });
   const tz = env.TIMEZONE || "Asia/Ho_Chi_Minh";
   const now = () => todayIn(tz);
   const snap = () => snapshot(env, src);
   const ro = { readOnlyHint: true, openWorldHint: false } as const;
+  const meta = (reason: string): A.WriteMeta => ({ via: "mcp", ...(props.client ? { client: props.client } : {}), reason });
 
   const wrap =
     <T,>(fn: (args: T) => Promise<unknown>) =>
@@ -124,6 +133,7 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
         "Amounts are positive whole numbers in the base currency in the simple form; lines are signed and sum to 0.",
         "Moves between the owner's accounts (card payments, savings, investments, loans) are transfers, never expense or income.",
         "Correct a mistake with edit_transaction or void_transaction; never add a reversing entry unless asked.",
+        "Every add_/edit_/void_transaction needs reason: one line saying what the owner asked, close to their own words (it is kept on the transaction and in the commit).",
       ],
       base: s.ledger.meta.base,
       categories: {
@@ -280,22 +290,22 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
     "add_transaction",
     {
       description: "PREVIEW a new transaction (writes nothing). Simple form: kind + amount + account (+ category or to_account). Full form: lines.",
-      inputSchema: z.object(txFields),
+      inputSchema: z.object({ ...txFields, reason }),
       annotations: pv,
     },
-    wrap(async (a) => preview((f) => A.addTransaction(f, a))),
+    wrap(async ({ reason, ...a }) => preview((f) => A.addTransaction(f, a, meta(reason)))),
   );
 
   server.registerTool(
     "edit_transaction",
-    { description: "PREVIEW changes to a transaction by id (only the fields given change).", inputSchema: z.object({ id: z.string(), ...txFields, date: z.string().optional() }), annotations: pv },
-    wrap(async ({ id, ...patch }) => preview((f) => A.editTransaction(f, id, patch))),
+    { description: "PREVIEW changes to a transaction by id (only the fields given change).", inputSchema: z.object({ id: z.string(), ...txFields, date: z.string().optional(), reason }), annotations: pv },
+    wrap(async ({ id, reason, ...patch }) => preview((f) => A.editTransaction(f, id, patch, meta(reason)))),
   );
 
   server.registerTool(
     "void_transaction",
-    { description: "PREVIEW voiding a transaction (kept in history, excluded everywhere).", inputSchema: z.object({ id: z.string(), reason: z.string().optional() }), annotations: pv },
-    wrap(async ({ id, reason }) => preview((f) => A.voidTransaction(f, id, reason))),
+    { description: "PREVIEW voiding a transaction (kept in history, excluded everywhere).", inputSchema: z.object({ id: z.string(), reason }), annotations: pv },
+    wrap(async ({ id, reason }) => preview((f) => A.voidTransaction(f, id, reason, meta(reason)))),
   );
 
   const accountFields = {

@@ -77,6 +77,17 @@ export interface Transaction {
   void?: boolean;
   lines: Line[];
   src?: { import: string; key: string; [k: string]: unknown };
+  /** How the transaction got its current form: one entry per add/edit/void made through a client (MCP...). */
+  trail?: TrailEntry[];
+  [k: string]: unknown;
+}
+
+export interface TrailEntry {
+  op: "add" | "edit" | "void";
+  at: string; // ISO timestamp (UTC)
+  via: string; // "mcp", "cli"...
+  client?: string; // the connected app's name, when known
+  reason?: string; // one line: what the owner asked for
   [k: string]: unknown;
 }
 
