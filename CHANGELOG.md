@@ -6,6 +6,10 @@
   (`period`), plus `bank` and `product` from the card's details. `all: true` lists every open card, also those
   with nothing owed.
 - New optional card detail `product`: the bank's own name for the card.
+- Optional OpenWallet source (off by default; `ownledger deploy --openwallet`): `best_card` ranks your own cards
+  for one purchase (merchant or kind) by cashback, using each card's spend and cashback this statement period, with
+  available credit, due date and budget left. Cards are looked up by `details.product` and `details.bank` each time;
+  nothing from OpenWallet is stored. README "OpenWallet" lists exactly what is sent.
 - Question evals (`evals/questions.md`): the owner's questions, the tool calls that answer them and the facts that
   must come back, plus guards (no invented account, category, date or amount; writes only preview). Run in `pnpm test`.
 

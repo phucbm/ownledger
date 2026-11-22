@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import { join, resolve } from "node:path";
 import { parse as parseJsonc } from "./jsonc.js";
 import { appJwt } from "../worker/github.js";
+import { OPENWALLET_DEFAULT_URL } from "../worker/openwallet.js";
 
 /**
  * ownledger deploy: the user's Worker on the user's Cloudflare, reading the user's private repo through
@@ -22,6 +23,16 @@ interface Ctx {
 function opt(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
   return i >= 0 ? args[i + 1] : undefined;
+}
+
+/** `--openwallet` (OpenWallet's public URL) or `--openwallet=<url>` turns the OpenWallet source on, `--no-openwallet` off; undefined = unchanged. */
+export function openwalletFlag(args: string[]): string | null | undefined {
+  if (args.includes("--no-openwallet")) return null;
+  const a = args.find((x) => x === "--openwallet" || x.startsWith("--openwallet="));
+  if (!a) return undefined;
+  const url = a.includes("=") ? a.slice(a.indexOf("=") + 1) : OPENWALLET_DEFAULT_URL;
+  if (!/^https?:\/\//.test(url)) throw new Error(`--openwallet needs an http(s) URL, got "${url}"`);
+  return url;
 }
 
 function run(cmd: string, args: string[], cwd: string, input?: string): string {
@@ -254,6 +265,10 @@ export async function cmdDeploy(args: string[]): Promise<number> {
   }
   cfg = { ...baseConfig(c, accountId, kv, publicUrl), ...(cfg.routes ? { routes: cfg.routes } : {}) };
   if (cfg.vars && readConfig(c).vars?.ALLOWED_LOGINS) cfg.vars.ALLOWED_LOGINS = readConfig(c).vars.ALLOWED_LOGINS;
+  const ow = openwalletFlag(args);
+  const owUrl = ow === undefined ? readConfig(c).vars?.OPENWALLET_URL : ow;
+  if (cfg.vars && owUrl) cfg.vars.OPENWALLET_URL = owUrl;
+  say(owUrl ? `✓ OpenWallet source on (${owUrl}): best_card sends card product names and purchases there. --no-openwallet turns it off.` : "  OpenWallet source off (--openwallet turns it on).");
   writeConfig(c, cfg);
 
   const have = secretNames(c);

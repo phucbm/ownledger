@@ -1,6 +1,6 @@
 # 002: cards this period, question evals, and an opt-in OpenWallet source
 
-Written: 2026-11-22. Status: In progress
+Written: 2026-11-22. Status: Built locally, waiting for the owner's review
 
 ## Goal
 
@@ -48,6 +48,15 @@ cashback **given what each card has already spent and earned this statement peri
 ## Progress
 
 - 2026-11-22 Plan written.
+- 2026-11-22 Phase 1 done (cards period, product, `all`). Phase 2 done (18 question evals in `pnpm test`).
+- 2026-11-22 Phase 3 done on local branches `purchase-intent-and-card-state`: openwallet-data engine `intent` (738f02d),
+  openwallet-mcp-v2 `purchase.intent` + `cards` state (a81e824). The kit records no tool arguments (metrics: tool name,
+  status, latency, sizes; logs: route and status; only an internal error's stack could carry input).
+- 2026-11-22 Phase 4 done: OpenWallet client, `best_card`, `--openwallet` for deploy/dev, docs. Checked end to end
+  against openwallet-mcp-v2 running locally on the real catalog (card found by product + bank, cap_remaining from
+  the period's cashback, candidates only from the owner's bank).
+- Left for the owner: review, push the three branches, deploy openwallet-mcp-v2 (with the engine published), release
+  ownledger (minor), then `ownledger deploy --openwallet` and `details.product` on the real cards.
 
 ## Later
 

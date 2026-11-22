@@ -46,14 +46,15 @@ Ask in chat:
 - "How much did I spend on food this year vs last year?" → `report`
 - "Net worth over the last 12 months" → `net_worth`
 - "Move category cafe under drinks" → preview of the remap of every line → go
+- "Quẹt thẻ nào khi đi siêu thị 1 triệu?" → `best_card` (only with the OpenWallet source on, see below)
 
-Tools: `about`, `rules`, `accounts`, `transactions`, `report`, `net_worth`, `cards`, `plans_due`, `deposits`, `today`; previews `add_transaction`, `edit_transaction`, `void_transaction`, `add_account`, `edit_account`, `add_plan`, `add_price`, `add_category`, `edit_category`; and `apply(preview_id)`, which commits a preview and is refused if the data changed since.
+Tools: `about`, `rules`, `accounts`, `transactions`, `report`, `net_worth`, `cards`, `plans_due`, `deposits`, `today`; previews `add_transaction`, `edit_transaction`, `void_transaction`, `add_account`, `edit_account`, `add_plan`, `add_price`, `add_category`, `edit_category`; and `apply(preview_id)`, which commits a preview and is refused if the data changed since. With the OpenWallet source on: `best_card`.
 
 ## What talks to what
 
 | Part | Talks to | Never |
 |---|---|---|
-| Your Worker | GitHub's API only (your repo, with a 1-hour token scoped to that one repo) | any other server, analytics, telemetry |
+| Your Worker | GitHub's API (your repo, with a 1-hour token scoped to that one repo); and only if you turn it on, OpenWallet (below) | any other server, analytics, telemetry |
 | Your AI client | your Worker's `/mcp` with a token your Worker issued (1 h, refreshable 30 days, revocable in the dashboard) | your GitHub credentials |
 | GitHub sign-in | proves who you are; your Worker reads your login, then revokes that GitHub token at once | kept anywhere |
 | The CLI | GitHub (`gh`), Cloudflare (`wrangler`), npm | sending your data anywhere |
@@ -76,14 +77,27 @@ AGENTS.md               the rules any AI follows in this repo
 
 Plain text, diffable, yours. See [AGENTS.md](AGENTS.md) for the format.
 
+### OpenWallet (optional, off by default)
+
+[OpenWallet](https://openwallet.vn) is a public catalog of bank cards in Vietnam (fees, cashback rules, caps). With it
+on, `best_card` answers "which of my cards pays the most for this purchase", counting what each card already spent
+and earned this statement period, next to your available credit, due date and budget.
+
+- **Turn on:** `ownledger deploy --openwallet` (or `--openwallet=<url>`). **Off:** `ownledger deploy --no-openwallet`.
+- **What is sent, only when you ask `best_card`:** each card's product name and bank (`details.product`, or the account
+  name, and `details.bank`), the purchase (amount, merchant or kind, date), and per card the spend and cashback booked
+  this statement period. Never account ids, notes, balances, limits or any other transaction.
+- **Nothing is stored:** your data never holds OpenWallet ids or slugs; cards are looked up by name each time.
+  Set `details.product` to the bank's own name for the card (e.g. `MSB Visa Online`) so it is found.
+
 ## CLI
 
 ```
 ownledger init [name]      create a data repo
 ownledger check [dir]      check the data (CI runs it)
 ownledger import <file>    import an export (--profile, --preset misa, --yes)
-ownledger deploy           deploy or update your Worker
-ownledger dev [dir]        run your Worker locally against the local folder (sign-in skipped)
+ownledger deploy           deploy or update your Worker (--openwallet / --no-openwallet)
+ownledger dev [dir]        run your Worker locally against the local folder (sign-in skipped; --openwallet[=<url>])
 ```
 
 ## Development

@@ -13,6 +13,8 @@ import type { Env, Props } from "./env.js";
 import { MainMovedError } from "./github.js";
 import { applyPending, savePending, snapshot, sourceFor, type DataSource } from "./store.js";
 import { VERSION } from "./version.js";
+import { bestCard } from "./bestcard.js";
+import { openWalletClient, type OpenWallet } from "./openwallet.js";
 
 type Result = { content: { type: "text"; text: string }[]; isError?: boolean };
 const out = (v: unknown): Result => ({ content: [{ type: "text", text: typeof v === "string" ? v : JSON.stringify(v) }] });
@@ -21,6 +23,8 @@ const fail = (msg: string): Result => ({ content: [{ type: "text", text: msg }],
 const INSTRUCTIONS = `ownledger: the owner's personal finance ledger, kept in their private GitHub repo.
 Amounts are whole numbers in the base currency (see about). Answers are computed here; never add up raw rows yourself when a tool computes it.
 Writes: the add_/edit_/void_ tools only PREVIEW. Show the owner the preview (what, amounts, accounts), wait for their explicit go, then call apply with the preview_id. Never invent an amount, date, account or category: ask. Call rules once before the first write.`;
+const OPENWALLET_LINE = `
+Which card to use for a purchase: best_card (the owner turned on OpenWallet, an outside card catalog: it gets the cards' product names and the purchase). Quote its cashback with OpenWallet's date and link; unknown is not 0. If a card is in not_matched, say so and how to fix it.`;
 
 function compactTx(t: Transaction) {
   return {
@@ -69,8 +73,14 @@ const reason = z
   .max(A.REASON_MAX)
   .describe("Required. One line: what the owner asked for, close to their own words (kept on the transaction's trail and in the commit).");
 
-export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(env)): McpServer {
-  const server = new McpServer({ name: "ownledger", version: VERSION }, { instructions: INSTRUCTIONS });
+export interface Deps {
+  /** OpenWallet client; by default made from env.OPENWALLET_URL (unset = off) */
+  openwallet?: OpenWallet | null;
+}
+
+export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(env), deps: Deps = {}): McpServer {
+  const ow = deps.openwallet !== undefined ? deps.openwallet : env.OPENWALLET_URL ? openWalletClient(env.OPENWALLET_URL) : null;
+  const server = new McpServer({ name: "ownledger", version: VERSION }, { instructions: INSTRUCTIONS + (ow ? OPENWALLET_LINE : "") });
   const tz = env.TIMEZONE || "Asia/Ho_Chi_Minh";
   const now = () => todayIn(tz);
   const snap = () => snapshot(env, src);
@@ -275,6 +285,29 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
       return all ? list : list.filter((c) => c.owed !== 0 || (c.toPay ?? 0) > 0);
     }),
   );
+
+  if (ow) {
+    server.registerTool(
+      "best_card",
+      {
+        description:
+          "Which of the owner's credit cards pays the most cashback for one purchase, given what each card already spent and earned this statement period; with available credit, due date and (with category) the budget left. Asks OpenWallet (outside source the owner turned on): sends the cards' product names and banks, the purchase, and each card's spend and cashback this period.",
+        inputSchema: z.object({
+          amount: z.number().int().positive().describe("the purchase, whole base-currency units"),
+          merchant: z.string().optional().describe("where, e.g. Shopee, Co.opmart, Grab"),
+          kind: z.string().optional().describe("what kind, when no merchant: OpenWallet spending kind, e.g. groceries, dining, fuel, travel"),
+          date: z.string().optional().describe("yyyy-mm-dd, default today"),
+          category: z.string().optional().describe("the owner's category path for this purchase (e.g. food/groceries): adds the budget left"),
+          accounts: z.array(z.string()).optional().describe("only these card account ids"),
+        }),
+        annotations: { readOnlyHint: true, openWorldHint: true },
+      },
+      wrap(async (a) => {
+        const s = await snap();
+        return bestCard(s.ledger, now(), ow, a);
+      }),
+    );
+  }
 
   server.registerTool("plans_due", { description: "Instalments, loan payments and premiums due in the next N days (and overdue), plus what's left per plan.", inputSchema: z.object({ days: z.number().int().max(366).optional() }), annotations: ro }, wrap(async ({ days }) => {
     const s = await snap();
