@@ -32,10 +32,17 @@ transfers:
 # Sheet name (as in the file) → account. Sheet names are cut to 31 characters and repeated names get
 # a _NN suffix; put the full wallet name(s) from the transfer notes in `names`.
 # Lift facts users write into wallet names (card statement/due day, deposit term and start) into details.
+# Credit card codes are also read on every import: 🗓️7 statement day, 💸3 due day, *1234 last 4, 🎉02/25 card
+# anniversary (fee month), 1-5tr cashback spend band, category emoji before the first "•" (cashback categories).
+# Quote any name with a comma: name: "Đầu tư khác (chứng khoán, CCQ)".
 accounts: {}
 #  "cash": { id: cash, name: Tiền mặt, type: cash }
 #  "vcb _1234 🗓️20💸5": { id: card-vcb, name: VCB Visa, type: credit_card, names: ["vcb _1234 🗓️20💸5"], details: { statement_day: 20, due_day: 5 } }
 #  "gửi 6 tháng từ 01_07_2025": { id: dep-20250701, name: Gửi 6 tháng từ 01/07/2025, type: deposit, names: ["gửi 6 tháng từ 01/07/2025"], details: { term_months: 6, start: 2025-07-01 } }
+
+# Category emoji in card names → category path (defaults: 🛒 shopping, 🏋️ health/sport, 🍿 fun/entertainment,
+# 📞 subscriptions, 🍜 food/eating-out, ☕ food/cafe, ⛽ transport/fuel, ✈️ fun/trips). Add or change your own here.
+card_emoji: {}
 
 # "Hạng mục cha/Hạng mục con" (or just the parent) → ownledger category path.
 categories: {}

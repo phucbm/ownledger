@@ -21,23 +21,21 @@ the same change.
 
 ## Q2. Thẻ tín dụng đang nợ bao nhiêu, khi nào phải trả?
 - tool: cards {}
-- expect: "owed":487000
-- expect: "statementBalance":137000,"paidSinceStatement":75000,"toPay":62000
-- expect: "dueDate":"2026-11-05"
-- expect: "available":49513000
+- expect: "owed":487000,"limit":50000000
+- expect: "last_statement":{"date":"2026-10-20","amount_due":137000,"paid":0,"to_pay":137000,"due":"2026-11-05","status":"due"}
 
 # Cards this period
 
 ## Q3. Kỳ sao kê này tôi đã quẹt thẻ Visa bao nhiêu, cho những gì?
-- tool: cards {"all": true}
-- expect: "from":"2026-10-21","to":"2026-11-03","basis":"statement"
-- expect: "spent":425000,"refunds":50000
+- tool: cards {}
+- expect: "period":{"from":"2026-10-21","to":"2026-11-03","spent":425000,"refunds":50000
 - expect: {"category":"food/groceries","amount":300000}
-- expect: "cashback":25000
+- expect: "cashback_booked":25000
 
 ## Q4. Thẻ của tôi là loại thẻ gì (để tra hoàn tiền)?
-- tool: cards {"all": true}
-- expect: "bank":"Demo Bank","product":"Demo Visa Cashback"
+- tool: cards {}
+- expect: "bank":"Demo Bank"
+- expect: "product":"Demo Visa Cashback"
 
 # Reports
 

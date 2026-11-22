@@ -66,20 +66,31 @@ describe("best_card", () => {
     const rank = calls.find((c) => c.tool === "rank_cards_for_spend")!.args;
     // spent 425,000 - refunds 50,000 this period; 25,000 cashback booked
     expect(rank).toEqual({ purchase: { amount: 300000, date: ASOF, intent: "groceries" }, cards: [{ id: "demo-visa-cashback", spend_so_far: 375000, cap_used: 25000 }], limit: 20 });
-    expect(r.ranking[0]).toMatchObject({
+    expect(r.cards[0]).toMatchObject({
       account: "card-visa",
-      cashback: 15000,
+      source: "openwallet",
+      earn: 15000,
+      rate: 5,
+      capLeft: 275000,
       spend_so_far: 375000,
       cap_used: 25000,
-      available: 49513000,
-      enough_credit: true,
-      dueDate: "2026-11-05",
+      limitLeft: 49513000,
       openwallet: { id: "demo-visa-cashback", url: "https://openwallet.vn/the/demo-visa-cashback", lastChecked: "2026-11-01" },
     });
+    expect(r.cards[0].payBy).toBeTruthy();
     expect(r.budget).toEqual({ category: "food", every: "month", amount: 4000000, spent: 0, left: 4000000 });
-    expect(r.source).toEqual({ name: "OpenWallet", url: "https://ow.test/mcp", catalog: { version: "v1", date: "2026-11-22" } });
-    expect(r.assumptions.join(" ")).toMatch(/cap_used is the cashback booked/);
+    expect(r.openwallet).toEqual({ url: "https://ow.test/mcp", catalog: { version: "v1", date: "2026-11-22" }, what: "Siêu thị" });
+    expect(r.assumptions.join(" ")).toMatch(/cap used can be higher/);
     expect(r.not_matched).toBeUndefined();
+  });
+
+  it("a card with the owner's own cashback terms is ranked here: OpenWallet isn't asked about it", async () => {
+    const { ow, calls } = fakeOw();
+    const own = { ...L, accounts: L.accounts.map((a) => (a.id === "card-visa" ? { ...a, details: { ...a.details, cashback: { base: 1, rules: [{ categories: ["food"], rate: 4 }] } } } : a)) };
+    const r: any = await bestCard(own, ASOF, ow, { amount: 300000, kind: "groceries", category: "food/groceries" });
+    expect(calls.filter((c) => c.tool === "search_cards" || c.tool === "rank_cards_for_spend")).toEqual([]);
+    expect(r.cards[0]).toMatchObject({ account: "card-visa", source: "yours", rate: 4, earn: 12000 });
+    expect(r.openwallet).toBeUndefined();
   });
 
   it("sends only product names, the purchase and per-card figures: no account ids, notes or balances", async () => {
@@ -98,27 +109,32 @@ describe("best_card", () => {
       search_cards: () => ({ cards: [{ id: "a", name: "Demo Visa Gold", bank: "demo-bank", type: ["credit"] }, { id: "b", name: "Demo Visa Platinum", bank: "demo-bank", type: ["credit"] }] }),
     });
     const r: any = await bestCard(L, ASOF, ow, { amount: 100000, kind: "groceries" });
-    expect(r.ranking).toEqual([]);
+    expect(r.cards[0]).toMatchObject({ account: "card-visa", source: "none", earn: null });
     expect(r.not_matched[0]).toMatchObject({ account: "card-visa", candidates: [{ id: "a" }, { id: "b" }] });
     expect(r.not_matched[0].why).toMatch(/set details.product/);
   });
 
-  it("unknown kind or merchant is an error listing what OpenWallet knows", async () => {
+  it("unknown kind or merchant is an error listing what OpenWallet knows; neither given, OpenWallet isn't asked", async () => {
     const { ow } = fakeOw();
     await expect(bestCard(L, ASOF, ow, { amount: 1, kind: "spaceships" })).rejects.toThrow(/groceries, dining/);
     await expect(bestCard(L, ASOF, ow, { amount: 1, merchant: "Nowhere" })).rejects.toThrow(/doesn't know the merchant/);
-    await expect(bestCard(L, ASOF, ow, { amount: 1 })).rejects.toThrow(/merchant .* or kind/);
+    const r: any = await bestCard(L, ASOF, ow, { amount: 1 });
+    expect(r.assumptions.join(" ")).toMatch(/give a merchant .* or a kind/);
+    expect(r.cards[0]).toMatchObject({ account: "card-visa", source: "none" });
   });
 
-  it("the tool exists only when OpenWallet is on, and the instructions say so", async () => {
+  it("best_card works without OpenWallet (own terms only); with it on, cards without terms are looked up", async () => {
     const off = await connect({ openwallet: null });
-    expect(await off.tools()).not.toContain("best_card");
+    expect(await off.tools()).toContain("best_card");
+    const r0 = await off.call("best_card", { amount: 300000, kind: "groceries" });
+    expect(r0.isError).toBe(false);
+    expect(r0.text).toContain('"source":"none"');
+    expect(r0.text).not.toContain('"openwallet":{');
     await off.close();
     const on = await connect({ openwallet: fakeOw().ow });
-    expect(await on.tools()).toContain("best_card");
     const r = await on.call("best_card", { amount: 300000, kind: "groceries" });
     expect(r.isError).toBe(false);
-    expect(r.text).toContain('"account":"card-visa"');
+    expect(r.text).toContain('"source":"openwallet"');
     await on.close();
   });
 });

@@ -3,6 +3,7 @@ import type { Account, Ledger, Line, Transaction } from "../engine/types.js";
 import { stableKey } from "./hash.js";
 import type { AccountMap, Mapping } from "./mapping.js";
 import type { Cell, Sheet, Workbook } from "./workbook.js";
+import { DEFAULT_CARD_EMOJI, mergeNameCodes, parseCardName } from "../modules/cards/terms.js";
 
 export interface SourceRow {
   sheet: string;
@@ -43,6 +44,10 @@ export interface ImportResult {
   rows: number;
   transactions: Transaction[]; // new ones (not already in the ledger)
   accounts: Account[]; // accounts to add to accounts.yaml
+  /** Card terms read from wallet names (🗓️ statement day, 💸 due day…) for accounts already in the ledger. */
+  accountUpdates: { id: string; set: Record<string, unknown> }[];
+  /** Codes in wallet names that couldn't be read (never guessed). */
+  nameWarnings: string[];
   skipped: number; // already imported (same key)
   changed: { key: string; id: string; was: string; now: string }[];
   /** Opening/rounding transactions whose amount changed on re-import: replaced, since they are derived from the file. */
@@ -238,7 +243,7 @@ export function runImport(wb: Workbook, m: Mapping, ledger: Ledger | null): Impo
   const { rows, sheets, errors } = readRows(wb, m);
   const unmatched = m.unmatched_account ?? "import-unmatched";
   const res: ImportResult = {
-    ok: false, source: m.source, rows: rows.length, transactions: [], accounts: [], skipped: 0, changed: [], replace: [], gone: [],
+    ok: false, source: m.source, rows: rows.length, transactions: [], accounts: [], accountUpdates: [], nameWarnings: [], skipped: 0, changed: [], replace: [], gone: [],
     unpaired: [], unresolvedCategories: [], unresolvedRows: [], reconcile: [], rounding: [], zeroed: [], errors,
   };
 
@@ -413,6 +418,27 @@ export function runImport(wb: Workbook, m: Mapping, ledger: Ledger | null): Impo
     made.add(a.id);
     const { names: _n, ...rest } = a;
     res.accounts.push({ ...rest, id: a.id, name: a.name ?? a.id, type: a.type ?? "other" } as Account);
+  }
+  // card terms in wallet names: on every import and re-import (credit cards only; the owner's own values win)
+  const emoji = { ...DEFAULT_CARD_EMOJI, ...((m.card_emoji as Record<string, string> | undefined) ?? {}) };
+  for (const [source, a] of Object.entries(accMap)) {
+    if ((a.type ?? ledger?.accounts.find((x) => x.id === a.id)?.type) !== "credit_card") continue;
+    const names = [...(a.names ?? []), source]; // full names first: sheet names also turn "*" into "_"
+    // sheet names are cut at 31 characters: read the longest name the source uses
+    const name = [...names].sort((x, y) => [...y].length - [...x].length)[0]!;
+    const codes = parseCardName(name, emoji);
+    res.nameWarnings.push(...codes.warnings);
+    if (!Object.keys(codes.details).length) continue;
+    const made1 = res.accounts.find((x) => x.id === a.id);
+    if (made1) {
+      const merged = mergeNameCodes(made1.details, codes.details);
+      if (merged) made1.details = merged;
+      continue;
+    }
+    const cur = ledger?.accounts.find((x) => x.id === a.id);
+    if (!cur) continue;
+    const merged = mergeNameCodes(cur.details, codes.details);
+    if (merged) res.accountUpdates.push({ id: a.id, set: { details: merged } });
   }
   if (built.some((t) => t.lines.some((l) => l.account === unmatched)) && !existing.has(unmatched) && !made.has(unmatched)) {
     res.accounts.push({ id: unmatched, name: "Chưa khớp khi nhập / unmatched import", type: "other", note: "Transfers whose other side was not in the file. Should end at 0." });

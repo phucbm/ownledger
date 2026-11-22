@@ -135,6 +135,8 @@ export interface Ledger {
   transactions: Transaction[];
   /** Which file each transaction came from (for check messages). */
   txFile: Map<string, string>;
+  /** Modules' own files, keyed by module name (e.g. cards: data/cards.yaml). */
+  ext?: Record<string, unknown>;
 }
 
 export interface Issue {

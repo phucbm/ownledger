@@ -14,6 +14,9 @@ amounts, and never write without the owner's go. `npx ownledger check` must pass
 | `data/plans.yaml` | Instalments, loans, insurance premiums, deposit schedules: `{id, kind, account, principal?, count?, every, start, amount?, fee?, rate?}` |
 | `data/budgets.yaml` | Optional: `{category, amount, every: month|year}` |
 | `data/prices.csv` | `date,asset,price`: price of 1 unit in base currency |
+| `data/cards.yaml` | Optional: every physical or virtual card, credit or not (see Cards) |
+| `data/cards/statements.yaml` | Optional: the bank's amount per card statement `{account, statement_date, amount}` |
+| `data/dashboards/<login>.yaml` | One person's dashboard: widgets and preferences (see Dashboard) |
 | `data/ledger/yyyy/mm.jsonl` | One transaction per line, in the month file of its date |
 | `imports/raw/` | Original exports, kept as received |
 | `imports/<source>.mapping.yaml` | How to read one app's export (see below) |
@@ -41,10 +44,34 @@ amounts, and never write without the owner's go. `npx ownledger check` must pass
 
 ## Account types
 
-`cash`, `bank`, `ewallet`, `credit_card` (details: `statement_day`, `due_day`, `limit`, and optionally `bank` and `product`: the bank's own name for the card, e.g. "MSB Visa Online", used to look the card up in a card catalog such as OpenWallet), `bnpl`, `deposit`
+`cash`, `bank`, `ewallet`, `credit_card` (details: `statement_day`, `due_day`, `limit`, optionally `bank` and `product`: the bank's own name for the card, e.g. "MSB Visa Online", used to look the card up in a card catalog such as OpenWallet; and the card terms below), `bnpl`, `deposit`
 (details: `principal`, `rate` (annual %), `term_months`, `start`, `maturity`, `rollover`), `savings_goal` (`target`, `by`),
 `gold`, `fund`, `stock`, `etf`, `crypto`, `insurance`, `loan_given`, `loan_taken`, `other`.
 A type not on this list is still fine: it loads as a plain account with a warning. Extra keys are kept.
+
+## Cards
+
+A credit card is an account (`type: credit_card`): purchases on it, payments to it. Its terms are in `details`, all optional:
+`statement_day`, `due_day`, `limit`, `bank`, `number_last4`, `annual_fee`, `fee_month` (1-12, also the start of the card year),
+`fee_waiver: {spend, within: year}`, `free_days_max`, and
+`cashback: {base, rules: [{categories: [paths], rate}], cap: {amount, per}, min_spend: {amount, per}, spend_max: {amount, per}, paid_on: next_statement | days_after:<n>}`
+(`per` is `statement` or `month`; rates are %; a rule's `rate: null` means not known yet).
+`from_name: [keys]` lists the keys read from codes in an import's wallet names (🗓️ statement day, 💸 due day, category emoji,
+🎉MM/YY anniversary, `1-5tr` spend band, `*1234`); a re-import updates only those, never a key the owner set.
+
+`data/cards.yaml` lists cards: `id`, `kind` (credit, debit, atm), `account` (credit: its account; debit: optionally the wallet
+its spending is on), `bank`, `name`, `network`, `last4` (quoted, never a full number), `status` (active, locked, inactive,
+cancelled), `issued`, `activated`, `cancelled`, `physical`, `apple_pay`, `annual_fee`, `close_fee`, `benefits` (value received
+outside cashback), `cancel_plan: {by: yyyy-mm, note}`, `keep_for_limit`, `fees_url`, `note`. A debit card with cashback carries
+`statement_day` (cycle start) and `cashback` here. A cashback paid to another account carries `card: <account id>` on the transaction.
+A 0% instalment is a plan `{kind: instalment, account: <card>, principal, count, every: month, start: <first statement>, source: <purchase id>}`.
+
+## Dashboard
+
+`data/dashboards/<login>.yaml`: `version: 1`, `widgets` (each `{id, type, x, y, w, h}` on a 12-column grid, plus `title`,
+`query` and `chart` for `type: chart`, options like `period`, `account`), and `prefs.pool` (the "My money" pool: `on`, `name`,
+`exclude: [ids]`, `default_account`). The pool is a view only: accounts stay separate in the data. With the pool on, spending with
+no account named goes to `default_account`. Change widgets through the connector's `add_widget` / `edit_widget` / `remove_widget`.
 
 ## Rules for writes
 

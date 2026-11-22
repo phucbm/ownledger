@@ -1,7 +1,7 @@
 import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { stringify } from "yaml";
+import { yamlText } from "../engine/write.js";
 import { defaultCategories } from "../engine/defaults.js";
 import type { FileMap } from "../engine/load.js";
 import { FORMAT } from "../engine/types.js";
@@ -32,7 +32,7 @@ export function pkgVersion(): string {
 
 /** The files `init` writes into a new data repo. */
 export function scaffold(o: ScaffoldOpts): FileMap {
-  const y = (v: unknown) => stringify(v, { lineWidth: 0 });
+  const y = yamlText;
   const files: FileMap = {
     "data/meta.yaml": y({ format: FORMAT, base: o.base, locale: o.lang, owner: o.owner ?? null, name: o.name }),
     "data/assets.yaml": y([{ id: o.base, name: CURRENCY_NAMES[o.base] ?? o.base, kind: "currency", decimals: DECIMALS[o.base] ?? 2 }]),

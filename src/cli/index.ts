@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
 import { pkgVersion } from "../node/scaffold.js";
+import { cmdCards } from "./cards.js";
 import { cmdCheck } from "./check.js";
 import { cmdDeploy } from "./deploy.js";
 import { cmdDev } from "./dev.js";
@@ -16,6 +17,7 @@ Usage: ownledger <command> [options]
   init [name]          Create a data repo (asks base currency, category language; private GitHub repo via gh)
   check [dir]          Check the data repo (default: current folder)
   import <file>        Import an export (profile first; preview; --yes writes, checks and commits)
+  cards load <csv>     Load a card tracker (CSV) into data/cards.yaml and the cards' limits (preview; --yes writes)
   deploy               Deploy your Worker to your Cloudflare (GitHub App, secrets, KV); prints the connector URL
                        --openwallet[=<url>] turns on the OpenWallet card catalog (best_card), --no-openwallet off
   dev [dir]            Run your Worker locally against the local data/ (fake sign-in); --openwallet[=<url>] as above
@@ -26,6 +28,7 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
   init: cmdInit,
   check: cmdCheck,
   import: cmdImport,
+  cards: cmdCards,
   dev: cmdDev,
   deploy: cmdDeploy,
 };

@@ -1,9 +1,9 @@
-import { parse as parseYaml, stringify } from "yaml";
+import { parse as parseYaml } from "yaml";
 import { checkFiles } from "./check.js";
 import { flattenCategories } from "./categories.js";
 import { isDate } from "./dates.js";
 import { LEDGER_FILE_RE, loadLedger, parseJsonl, PATHS, type FileMap } from "./load.js";
-import { applyChange, describeChange, type Change } from "./write.js";
+import { applyChange, describeChange, yamlText, type Change } from "./write.js";
 import type { Account, CategoriesFile, CategoryNode, Issue, Line, Plan, Price, Transaction, TrailEntry } from "./types.js";
 
 /**
@@ -166,6 +166,11 @@ export function voidTransaction(files: FileMap, id: string, reason?: string, met
   return plan(files, { replaceTransactions: [trailed(next, "void", meta)] }, withMeta(`Void: ${old.date} ${old.note ?? ""}`.trim(), meta));
 }
 
+/** The ledger of a set of files, for actions that read it before building a change. */
+export function loadForAction(files: FileMap) {
+  return loadLedger(files);
+}
+
 /* ------------------------------------------------------------------ accounts, plans, prices */
 
 export function addAccount(files: FileMap, a: Account): Planned {
@@ -220,7 +225,7 @@ export function addCategory(files: FileMap, c: { kind: "income" | "expense"; par
   }
   if (list.some((x) => x.id === c.id)) throw new ActionError(`category ${c.parent ? c.parent + "/" : ""}${c.id} exists`);
   list.push({ id: c.id, name: c.name });
-  return plan(files, { putFiles: { [PATHS.categories]: stringify(cats, { lineWidth: 0 }) } }, `Add category: ${c.parent ? c.parent + "/" : ""}${c.id}`);
+  return plan(files, { putFiles: { [PATHS.categories]: yamlText(cats) } }, `Add category: ${c.parent ? c.parent + "/" : ""}${c.id}`);
 }
 
 /** Rename a category (name), or move/rename its path and remap every line that uses it (or its children). */
@@ -253,9 +258,9 @@ export function editCategory(files: FileMap, path: string, set: { name?: string;
     if (replace.length) change.replaceTransactions = replace;
     const budgets = parseYaml(files[PATHS.budgets] ?? "[]") as { category: string }[] | null;
     if (budgets?.some((b) => remap(b.category) !== b.category)) {
-      change.putFiles = { [PATHS.budgets]: stringify(budgets.map((b) => ({ ...b, category: remap(b.category) })), { lineWidth: 0 }) };
+      change.putFiles = { [PATHS.budgets]: yamlText(budgets.map((b) => ({ ...b, category: remap(b.category) }))) };
     }
   }
-  change.putFiles = { ...(change.putFiles ?? {}), [PATHS.categories]: stringify(cats, { lineWidth: 0 }) };
+  change.putFiles = { ...(change.putFiles ?? {}), [PATHS.categories]: yamlText(cats) };
   return plan(files, change, set.new_path ? `Move category: ${path} → ${set.new_path}` : `Rename category: ${path}`);
 }

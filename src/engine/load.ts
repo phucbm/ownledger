@@ -1,4 +1,5 @@
 import { parse as parseYaml } from "yaml";
+import { MODULES } from "../modules/index.js";
 import type { Account, Asset, Budget, CategoriesFile, Issue, Ledger, Meta, Plan, Price, Transaction } from "./types.js";
 
 /** Files of a data repo, keyed by path relative to the repo root ("data/meta.yaml"). */
@@ -113,8 +114,12 @@ export function loadLedger(files: FileMap): { ledger: Ledger; issues: Issue[] } 
     return [];
   };
 
+  const ext: Record<string, unknown> = {};
+  for (const m of MODULES) if (m.load) ext[m.name] = m.load(files, issues);
+
   return {
     ledger: {
+      ext,
       meta: meta && typeof meta === "object" ? meta : { format: 0, base: "VND" },
       assets: asArray<Asset>(assets, PATHS.assets),
       accounts: asArray<Account>(accounts, PATHS.accounts),

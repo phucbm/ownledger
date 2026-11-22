@@ -29,7 +29,7 @@ export function previousPeriod(p: Period): Period {
   return { from: addDays(p.from, -len), to: addDays(p.from, -1) };
 }
 
-export type GroupBy = "category" | "top" | "account" | "who" | "event" | "tag" | "month";
+export type GroupBy = "category" | "top" | "account" | "who" | "event" | "tag" | "month" | "week" | "day";
 
 export interface ReportRow {
   key: string;
@@ -57,6 +57,13 @@ interface ReportOpts {
   /** Only lines under this category path (prefix). */
   category?: string;
   account?: string;
+}
+
+/** Monday of the week of d (yyyy-mm-dd). */
+function weekOf(d: ISODate): ISODate {
+  const [y, m, dd] = parts(d);
+  const dow = (new Date(Date.UTC(y, m - 1, dd)).getUTCDay() + 6) % 7;
+  return addDays(d, -dow);
 }
 
 function inPeriod(t: Transaction, p: Period) {
@@ -91,6 +98,8 @@ function aggregate(l: Ledger, p: Period, cats: Map<string, Category>, o: ReportO
         : by === "who" ? [[t.who ?? "(none)", t.who ?? "(none)"]]
         : by === "event" ? [[t.event ?? "(none)", t.event ?? "(none)"]]
         : by === "month" ? [[t.date.slice(0, 7), t.date.slice(0, 7)]]
+        : by === "day" ? [[t.date, t.date]]
+        : by === "week" ? [[weekOf(t.date), weekOf(t.date)]]
         : (t.tags?.length ? t.tags : ["(none)"]).map((g) => [g, g] as [string, string]);
       for (const [key, name] of keys) {
         const r = rows.get(key) ?? { key, name, income: 0, expense: 0, count: 0 };
@@ -130,7 +139,15 @@ export function report(l: Ledger, period: string | Period, o: ReportOpts = {}): 
 export interface TxQuery {
   from?: ISODate;
   to?: ISODate;
-  account?: string;
+  /** One account id, or several (e.g. every account in the "My money" pool). */
+  account?: string | string[];
+  who?: string;
+  event?: string;
+  tag?: string;
+  /** One transaction by id. */
+  tx?: string;
+  /** Hide transfers that stay inside this set of accounts (moves within the pool). */
+  hideWithin?: string[];
   category?: string; // prefix match on path
   text?: string;
   min?: number; // on the transaction's size (sum of positive line amounts)
@@ -150,17 +167,34 @@ export function txSize(t: Transaction): number {
   return t.lines.reduce((s, ln) => s + (ln.amount > 0 ? ln.amount : 0), 0);
 }
 
-export function queryTransactions(l: Ledger, q: TxQuery): { total: number; items: Transaction[] } {
+export interface TxTotals {
+  income: number; // as reports count it (category lines; under the category filter when given)
+  expense: number;
+  net: number;
+  count: number;
+}
+
+export function queryTransactions(l: Ledger, q: TxQuery): { total: number; items: Transaction[]; totals: TxTotals; days: Record<ISODate, { income: number; expense: number }> } {
   const text = q.text ? fold(q.text) : "";
   const hits: Transaction[] = [];
+  const accounts = q.account === undefined ? null : new Set(Array.isArray(q.account) ? q.account : [q.account]);
+  const within = q.hideWithin?.length ? new Set(q.hideWithin) : null;
+  const { map: cats } = flattenCategories(l.categories);
+  const totals: TxTotals = { income: 0, expense: 0, net: 0, count: 0 };
+  const byDay = new Map<ISODate, { income: number; expense: number }>();
   for (let i = l.transactions.length - 1; i >= 0; i--) {
     const t = l.transactions[i]!;
     if (t.void && !q.includeVoid) continue;
     if (q.from && t.date < q.from) continue;
     if (q.to && t.date > q.to) continue;
-    if (q.account && !t.lines.some((ln) => ln.account === q.account)) continue;
+    if (q.tx && t.id !== q.tx) continue;
+    if (accounts && !t.lines.some((ln) => ln.account != null && accounts.has(ln.account))) continue;
     if (q.category && !t.lines.some((ln) => ln.category === q.category || ln.category?.startsWith(q.category + "/"))) continue;
     if (q.plan && t.plan !== q.plan) continue;
+    if (q.who && t.who !== q.who) continue;
+    if (q.event && t.event !== q.event) continue;
+    if (q.tag && !(t.tags ?? []).includes(q.tag)) continue;
+    if (within && t.lines.every((ln) => ln.account != null && within.has(ln.account))) continue;
     const size = txSize(t);
     if (q.min !== undefined && size < q.min) continue;
     if (q.max !== undefined && size > q.max) continue;
@@ -169,10 +203,31 @@ export function queryTransactions(l: Ledger, q: TxQuery): { total: number; items
       if (!hay.includes(text)) continue;
     }
     hits.push(t);
+    if (!t.void) {
+      const day = byDay.get(t.date) ?? { income: 0, expense: 0 };
+      for (const ln of t.lines) {
+        if (ln.category == null || isSystemCategory(ln.category)) continue;
+        if (q.category && !(ln.category === q.category || ln.category.startsWith(q.category + "/"))) continue;
+        if ((cats.get(ln.category)?.kind ?? "expense") === "income") {
+          totals.income += -ln.amount;
+          day.income += -ln.amount;
+        } else {
+          totals.expense += ln.amount;
+          day.expense += ln.amount;
+        }
+      }
+      byDay.set(t.date, day);
+    }
   }
+  totals.net = totals.income - totals.expense;
+  totals.count = hits.length;
   const offset = q.offset ?? 0;
   const limit = Math.min(q.limit ?? 50, 500);
-  return { total: hits.length, items: hits.slice(offset, offset + limit) };
+  const items = hits.slice(offset, offset + limit);
+  // totals of every day shown on this page, over the whole filter (a day split across pages still shows its full net)
+  const days: Record<ISODate, { income: number; expense: number }> = {};
+  for (const t of items) days[t.date] = byDay.get(t.date) ?? { income: 0, expense: 0 };
+  return { total: hits.length, items, totals, days };
 }
 
 /** Month keys "yyyy-mm" from first to last inclusive. */

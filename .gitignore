@@ -4,3 +4,7 @@ node_modules/
 .wrangler/
 dist/
 .DS_Store
+assets/
+
+.claude/handoffs.md
+.claude/handoffs/
