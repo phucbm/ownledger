@@ -30,7 +30,7 @@ Written 2026-11-22. Status: idea. Not in plan 002; decide later whether it becom
 
 ## Example (made-up card)
 
-A card with a 20% rule on MCC 5722 (household appliance stores) capped at 300k per statement: a 15tr AC charged as 5722 earns 300k (2%), and only if the cap is untouched this statement. ownledger knows that; OpenWallet doesn't. Without Điện Máy Xanh's real MCC the whole answer is a guess, which is why need 1 comes first.
+OpenWallet's MCC crawls (`openwallet-api-v2/scripts/mcc/raw/`) show Điện Máy Xanh's terminals are mostly **MCC 5732** (electronics stores; 154 of 185), not 5722 (household appliance stores). So a card with a 20% rule on 5722 does **not** pay 20% on a 15tr AC there; a card with a rule on 5732, or a high base rate, wins. A cap of 300k per statement would hold even a 20% rule to 2%, and only if the cap is untouched this statement. ownledger knows the cap used; OpenWallet knows the MCC and the rules.
 
 ## Works today, no code
 
