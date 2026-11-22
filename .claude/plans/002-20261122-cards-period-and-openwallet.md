@@ -1,6 +1,6 @@
 # 002: cards this period, question evals, and an opt-in OpenWallet source
 
-Written: 2026-11-22. Status: Built locally, waiting for the owner's review
+Written: 2026-11-22. Status: Released (1.2.0); OpenWallet v2 deploy left
 
 ## Goal
 
@@ -55,8 +55,11 @@ cashback **given what each card has already spent and earned this statement peri
 - 2026-11-22 Phase 4 done: OpenWallet client, `best_card`, `--openwallet` for deploy/dev, docs. Checked end to end
   against openwallet-mcp-v2 running locally on the real catalog (card found by product + bank, cap_remaining from
   the period's cashback, candidates only from the owner's bank).
-- Left for the owner: review, push the three branches, deploy openwallet-mcp-v2 (with the engine published), release
-  ownledger (minor), then `ownledger deploy --openwallet` and `details.product` on the real cards.
+- 2026-11-22 Merged: ownledger#1, openwalletvn/openwallet-data#20 and #21, openwalletvn/openwallet-mcp-v2#7.
+  Published: `@openwalletvn/engine` 0.1.2 (GitHub Packages), `ownledger` 1.2.0 (npm, with provenance).
+- Left for the owner: deploy openwallet-mcp-v2 (its README "Deploy"; switch the engine to the registry 0.1.2),
+  then in `my-money` update ownledger, `ownledger deploy --openwallet`, and set `details.product` / `details.bank`
+  on the real cards.
 
 ## Later
 
