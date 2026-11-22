@@ -259,10 +259,22 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
     }),
   );
 
-  server.registerTool("cards", { description: "Credit cards: owed, last statement, what to pay, due date, available credit.", inputSchema: z.object({ date: z.string().optional() }), annotations: ro }, wrap(async ({ date }) => {
-    const s = await snap();
-    return cards(s.ledger, date ?? now()).filter((c) => c.owed !== 0 || (c.toPay ?? 0) > 0);
-  }));
+  server.registerTool(
+    "cards",
+    {
+      description: "Credit cards: owed, last statement, what to pay, due date, available credit, product name, and this statement period (spent by category, refunds, cashback credited).",
+      inputSchema: z.object({
+        date: z.string().optional(),
+        all: z.boolean().optional().describe("Every open card, also those with nothing owed (e.g. to choose a card for a purchase). Default: only cards with something owed."),
+      }),
+      annotations: ro,
+    },
+    wrap(async ({ date, all }) => {
+      const s = await snap();
+      const list = cards(s.ledger, date ?? now());
+      return all ? list : list.filter((c) => c.owed !== 0 || (c.toPay ?? 0) > 0);
+    }),
+  );
 
   server.registerTool("plans_due", { description: "Instalments, loan payments and premiums due in the next N days (and overdue), plus what's left per plan.", inputSchema: z.object({ days: z.number().int().max(366).optional() }), annotations: ro }, wrap(async ({ days }) => {
     const s = await snap();

@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- `cards` shows each card's current statement period: what was spent by category, refunds, and cashback credited
+  (`period`), plus `bank` and `product` from the card's details. `all: true` lists every open card, also those
+  with nothing owed.
+- New optional card detail `product`: the bank's own name for the card.
+
 ## 1.1.0 (2026-11-22)
 
 - Transactions record where they came from: `trail` gets one entry per add/edit/void made through the MCP

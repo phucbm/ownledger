@@ -22,7 +22,7 @@ const accounts: Account[] = [
   { id: "cash", name: "Ví tiền mặt", type: "cash", opened: "2023-01-01" },
   { id: "vcb", name: "Vietcombank", type: "bank", opened: "2023-01-01", details: { bank: "VCB", number_last4: "0001" } },
   { id: "momo", name: "MoMo", type: "ewallet", opened: "2023-01-01", details: { provider: "MoMo" } },
-  { id: "card-visa", name: "Thẻ Visa", type: "credit_card", opened: "2023-03-01", details: { statement_day: 20, due_day: 5, limit: 50000000, bank: "Demo Bank" } },
+  { id: "card-visa", name: "Thẻ Visa", type: "credit_card", opened: "2023-03-01", details: { statement_day: 20, due_day: 5, limit: 50000000, bank: "Demo Bank", product: "Demo Visa Cashback" } },
   { id: "spaylater", name: "SPayLater", type: "bnpl", opened: "2024-02-01", details: { provider: "Shopee", limit: 10000000, due_day: 10 } },
   { id: "dep-2024", name: "Sổ tiết kiệm 2024", type: "deposit", opened: "2024-01-15", closed: "2024-07-15", details: { bank: "VCB", principal: 50000000, rate: 4.8, term_months: 6, start: "2024-01-15", rollover: "none" } },
   { id: "dep-6m", name: "Sổ tiết kiệm 6 tháng", type: "deposit", opened: "2026-06-01", details: { bank: "VCB", principal: 100000000, rate: 5.2, term_months: 6, start: "2026-06-01", rollover: "principal" } },
@@ -177,6 +177,10 @@ earn("2026-01-25", "momo", "cashback", 85000, "Hoàn tiền MoMo");
 earn("2024-02-10", "cash", "gifts-received", 2000000, "Lì xì Tết");
 // a voided one, kept for history
 spend("2026-10-12", "cash", "other", 999000, "Nhập nhầm", { void: true });
+// this statement period on the card (2026-10-21 →): groceries, a refund and cashback
+spend("2026-10-27", "card-visa", "food/groceries", 350000, "Đi siêu thị");
+earn("2026-10-29", "card-visa", "cashback", 25000, "Hoàn tiền thẻ Visa");
+tx("2026-10-30", "Siêu thị hoàn tiền hàng lỗi", [{ account: "card-visa", amount: 50000 }, { category: "food/groceries", amount: -50000 }]);
 
 // write
 function write(dir: string, files: Record<string, string>) {

@@ -21,7 +21,10 @@
 {"id":"t_demo01113","date":"2026-10-16","time":null,"note":"Mua CCQ VESAF","lines":[{"account":"vcb","amount":-1999919},{"account":"fund-vesaf","asset":"VESAF","qty":76.26,"amount":1999919}]}
 {"id":"t_demo01110","date":"2026-10-22","time":null,"note":"Quần áo","lines":[{"account":"momo","amount":-396000},{"category":"shopping/clothes","amount":396000}]}
 {"id":"t_demo01106","date":"2026-10-26","time":null,"note":"food/cafe","lines":[{"account":"card-visa","amount":-63000},{"category":"food/cafe","amount":63000}]}
+{"id":"t_demo01136","date":"2026-10-27","time":null,"note":"Đi siêu thị","lines":[{"account":"card-visa","amount":-350000},{"category":"food/groceries","amount":350000}]}
 {"id":"t_demo01104","date":"2026-10-28","time":null,"note":"Cafe sáng","lines":[{"account":"momo","amount":-78000},{"category":"food/eating-out","amount":78000}]}
 {"id":"t_demo01107","date":"2026-10-28","time":null,"note":"Ăn trưa","lines":[{"account":"card-visa","amount":-12000},{"category":"transport/fares","amount":12000}]}
+{"id":"t_demo01137","date":"2026-10-29","time":null,"note":"Hoàn tiền thẻ Visa","lines":[{"account":"card-visa","amount":25000},{"category":"cashback","amount":-25000}]}
 {"id":"t_demo01097","date":"2026-10-30","time":null,"note":"Đi chợ","lines":[{"account":"cash","amount":-278000},{"category":"food/groceries","amount":278000}]}
 {"id":"t_demo01109","date":"2026-10-30","time":null,"note":"Cafe sáng","lines":[{"account":"cash","amount":-189000},{"category":"food/eating-out","amount":189000}]}
+{"id":"t_demo01138","date":"2026-10-30","time":null,"note":"Siêu thị hoàn tiền hàng lỗi","lines":[{"account":"card-visa","amount":50000},{"category":"food/groceries","amount":-50000}]}

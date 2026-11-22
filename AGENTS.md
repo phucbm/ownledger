@@ -41,7 +41,7 @@ amounts, and never write without the owner's go. `npx ownledger check` must pass
 
 ## Account types
 
-`cash`, `bank`, `ewallet`, `credit_card` (details: `statement_day`, `due_day`, `limit`), `bnpl`, `deposit`
+`cash`, `bank`, `ewallet`, `credit_card` (details: `statement_day`, `due_day`, `limit`, and optionally `bank` and `product`: the bank's own name for the card, e.g. "MSB Visa Online", used to look the card up in a card catalog such as OpenWallet), `bnpl`, `deposit`
 (details: `principal`, `rate` (annual %), `term_months`, `start`, `maturity`, `rollover`), `savings_goal` (`target`, `by`),
 `gold`, `fund`, `stock`, `etf`, `crypto`, `insurance`, `loan_given`, `loan_taken`, `other`.
 A type not on this list is still fine: it loads as a plain account with a warning. Extra keys are kept.
