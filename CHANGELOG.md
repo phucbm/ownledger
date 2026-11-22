@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 (unreleased)
+## 1.1.0 (2026-11-22)
 
 - Transactions record where they came from: `trail` gets one entry per add/edit/void made through the MCP
   connector (`op`, `at`, `via`, `client`, `reason`). Imports keep `src`; rows without a trail are unchanged.
