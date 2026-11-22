@@ -38,6 +38,8 @@ function rows(extra: boolean): Record<string, { full: string; opening: number; r
     { date: "01/07/2025", time: "09:00", out: 10000000, note: "Gửi tiết kiệm tài khoản " + W.dep + " (Chuyển tới cash)" },
     { date: "01/01/2026", time: "09:05", in: 10260000.4, note: "Tất toán sổ tiết kiệm " + W.dep + " (Chuyển từ " + W.dep + ")" },
     { date: "02/01/2026", time: "11:00", out: 2000000, note: "Vcbf mgf (Chuyển tới chứng chỉ quỹ)" },
+    { date: "02/01/2026", time: "15:00", out: 17000000, note: "8500k/chỉ" }, // gold bought, no wallet in MISA
+    { date: "02/01/2026", time: "16:00", out: 1234, parent: "Khoản chi bí ẩn", note: "Điều chỉnh số dư tài khoản" }, // MISA balance fix: _adjust by rule
     { date: "03/01/2026", time: "11:00", out: 300000, parent: "Chi tiêu hàng ngày", child: "Đi lại", event: "Đà Lạt 2026", note: "Xe" },
   ];
   if (extra) cash.push({ date: "20/01/2026", time: "19:00", out: 99000, parent: "Chi tiêu hàng ngày", child: "Ăn uống", note: "Bún" });

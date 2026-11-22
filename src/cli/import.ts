@@ -25,6 +25,7 @@ export function importReport(r: ImportResult, verbose = false): string {
     out.push("", "| sheet | account | rows | opening | in | out | closing (source) | closing (imported) | rounding | ok |", "|---|---|---|---|---|---|---|---|---|---|");
     for (const x of show) out.push(`| ${x.sheet} | ${x.account} | ${x.rows} | ${n(x.source.opening)} | ${n(x.source.in)} | ${n(x.source.out)} | ${n(x.source.closing)} | ${n(x.imported.closing)} | ${x.rounding} | ${x.ok ? "✓" : "✗ " + x.problems.join("; ")} |`);
   }
+  if (r.zeroed.length) out.push("", `Closed accounts set to 0 on their closing date (_adjust): ${r.zeroed.map((z) => `${z.account} ${z.amount > 0 ? "+" : ""}${z.amount}`).join(", ")}`);
   if (r.rounding.length) out.push("", `Rounding to whole units booked as _adjust: ${r.rounding.map((x) => `${x.sheet} ${x.diff > 0 ? "+" : ""}${x.diff}`).join(", ")}`);
   if (r.unpaired.length) {
     out.push("", `Transfers with no other side in the file (booked against the unmatched account, ${r.unpaired.length}):`);
@@ -90,7 +91,7 @@ export async function cmdImport(args: string[]): Promise<number> {
   }
 
   const mappingPath = findMapping(root, opt(args, "--mapping"));
-  if (args.includes("--profile") || !mappingPath) {
+  if (args.includes("--profile") || preset || !mappingPath) {
     console.log(profileText(profileWorkbook(wb)));
     if (!mappingPath)
       console.log(

@@ -4,7 +4,6 @@
 source: misa
 reader: table
 sheets: all
-header_row: 10
 account_from: sheet
 date_format: dd/mm/yyyy
 columns:

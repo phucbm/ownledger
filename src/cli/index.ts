@@ -2,6 +2,7 @@
 import { readFileSync } from "node:fs";
 import { cmdCheck } from "./check.js";
 import { cmdImport } from "./import.js";
+import { cmdInit } from "./init.js";
 
 const pkg = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")) as { version: string };
 
@@ -9,12 +10,14 @@ const HELP = `ownledger ${pkg.version}
 
 Usage: ownledger <command> [options]
 
+  init [name]          Create a data repo (asks base currency, category language; private GitHub repo via gh)
   check [dir]          Check the data repo (default: current folder)
   import <file>        Import an export (profile first; preview; --yes writes, checks and commits)
   --version            Print the version
 `;
 
 const commands: Record<string, (args: string[]) => Promise<number>> = {
+  init: cmdInit,
   check: cmdCheck,
   import: cmdImport,
 };

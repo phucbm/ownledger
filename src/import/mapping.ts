@@ -60,12 +60,18 @@ export interface Mapping {
   };
   /** Source account name (sheet name, column value) → ownledger account. */
   accounts: Record<string, AccountMap>;
-  /** Source category "Parent/Child" or "Parent" → ownledger category path. */
+  /** Source category "Parent/Child" or "Parent" → ownledger category path, or "account:<id>" for moves between own accounts. */
   categories: Record<string, string>;
+  /** Checked first, on every row that is not a transfer: regex on the note (and optionally the source category) → category or account:<id>. */
+  rules?: { match: string; category: string; sign?: "in" | "out"; source_category?: string }[];
   /** Rows with no category that are not transfers: first matching rule wins (regex on the note). */
   uncategorized?: { match: string; category: string; sign?: "in" | "out" }[];
   uncategorized_in?: string; // fallback category for money in
   uncategorized_out?: string; // fallback category for money out
+  /** Transfers whose other side is not in the file (e.g. a skipped sheet): regex on the named wallet → category or account:<id>. */
+  unpaired?: { wallet: string; category: string }[];
+  /** Book an _adjust on each closed account's closing date so it ends at exactly 0 (source rounding leftovers). */
+  zero_closed?: boolean;
   /** Account that receives transfers whose other side can't be found. Default "import-unmatched". */
   unmatched_account?: string;
   /** Opening balances (from totals.opening) are booked on this date, or on the account's first row date. */
@@ -105,7 +111,7 @@ export function validateMapping(m: Mapping): string[] {
       }
     }
   }
-  for (const u of m.uncategorized ?? []) {
+  for (const u of [...(m.rules ?? []), ...(m.uncategorized ?? []), ...(m.unpaired ?? []).map((x) => ({ match: x.wallet }))]) {
     try {
       new RegExp(u.match, "iu");
     } catch (x) {

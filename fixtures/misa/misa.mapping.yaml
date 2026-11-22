@@ -4,7 +4,6 @@
 source: misa
 reader: table
 sheets: all
-header_row: 10
 account_from: sheet
 date_format: dd/mm/yyyy
 columns:
@@ -40,6 +39,7 @@ accounts:
   "momo": { id: momo, name: MoMo, type: ewallet }
   "momo_4": { id: momo-2, name: MoMo (ví 2), type: ewallet }
   "chứng chỉ quỹ": { id: funds, name: Chứng chỉ quỹ, type: fund }
+  "_gold": { id: gold, name: Vàng, type: gold }
 categories:
   "Chi tiêu hàng ngày/Ăn uống": food/eating-out
   "Chi tiêu hàng ngày/Đi lại": transport/fares
@@ -49,5 +49,8 @@ categories:
   "Tiền vào": other-income
   "Tiền vào/Tiền lãi": interest
   "Tiền vào/Hoàn tiền": cashback
+rules:
+  - { match: "^Điều chỉnh số dư", category: _adjust }
 uncategorized:
   - { match: "bán đồ", category: other-income, sign: in }
+  - { match: "k/chỉ", category: "account:gold" }

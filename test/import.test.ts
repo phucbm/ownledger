@@ -62,8 +62,8 @@ describe("MISA-shaped import", () => {
     // the one transfer to a wallet not in the file is listed, not dropped
     expect(r.unpaired.map((u) => u.note)).toEqual(["Chuyển tới ví không có trong file"]);
     const transfers = r.transactions.filter((t) => t.lines.every((l) => l.account));
-    // cash→momo, cash→card, cash→deposit, deposit→cash, cash→fund, plus the unpaired one
-    expect(transfers.length).toBe(6);
+    // cash→momo, cash→card, cash→deposit, deposit→cash, cash→fund, cash→gold, plus the unpaired one
+    expect(transfers.length).toBe(7);
     const dep = transfers.find((t) => t.note?.startsWith("Gửi tiết kiệm"))!;
     expect(dep.lines.map((l) => l.account)).toEqual(["cash", "dep-20250701"]);
     expect(dep.note).toBe("Gửi tiết kiệm tài khoản gửi 6 tháng từ 01/07/2025");
@@ -75,6 +75,7 @@ describe("MISA-shaped import", () => {
     const h = holdingsAt(c.ledger);
     for (const x of r.reconcile) expect(h.get(x.account)!.amount).toBe(Math.round(x.source.closing!));
     expect(h.get("import-unmatched")!.amount).toBe(70000);
+    expect(h.get("gold")!.amount).toBe(17000000); // "account:" target: a move, not spending
     // float noise rounded: deposit closes at 0 after rounding interest and settlement
     expect(h.get("dep-20250701")!.amount).toBe(0);
   });
@@ -85,6 +86,8 @@ describe("MISA-shaped import", () => {
     expect(c.transactions.find((t) => t.note === "Xe")!.event).toBe("Đà Lạt 2026");
     expect(c.transactions.filter((t) => t.note === "Phở" && t.time === "12:30").length).toBe(2);
     expect(c.transactions.find((t) => t.note === "Bán đồ cũ")!.lines[1]!.category).toBe("other-income");
+    // a rule on the note wins over the source category (unmapped "Khoản chi bí ẩn" is never looked up)
+    expect(c.transactions.find((t) => t.note === "Điều chỉnh số dư tài khoản")!.lines[1]!.category).toBe("_adjust");
   });
 
   it("running twice changes nothing; a newer export adds only the new rows", () => {
@@ -99,6 +102,24 @@ describe("MISA-shaped import", () => {
     expect(newer.r.gone).toEqual([]);
     expect(newer.r.changed).toEqual([]);
     expect(checkFiles(newer.next).ok).toBe(true);
+  });
+
+  it("unpaired rules and zero_closed", () => {
+    const m2 = {
+      ...mapping,
+      zero_closed: true,
+      unpaired: [{ wallet: "không có trong file", category: "other" }],
+      accounts: { ...mapping.accounts, momo: { ...mapping.accounts.momo!, closed: "2025-01-31" } },
+    };
+    const r2 = runImport(wb, m2, loadLedger(empty).ledger);
+    expect(r2.ok).toBe(true);
+    expect(r2.unpaired).toEqual([]);
+    expect(r2.accounts.some((a) => a.id === "import-unmatched")).toBe(false);
+    expect(r2.zeroed).toEqual([{ account: "momo", date: "2025-01-31", amount: -4780000 }]);
+    const next = { ...empty, ...applyChange(empty, { addAccounts: r2.accounts, addTransactions: r2.transactions }) };
+    const c = checkFiles(next);
+    expect(c.ok).toBe(true);
+    expect(holdingsAt(c.ledger).get("momo")!.amount).toBe(0);
   });
 
   it("refuses when a category is not mapped", () => {

@@ -32,6 +32,7 @@ export interface Reconcile {
   source: { opening: number | null; in: number | null; out: number | null; closing: number | null };
   imported: { opening: number; in: number; out: number; closing: number };
   rounding: number; // whole units booked as _adjust so the closing balance matches exactly
+  zeroed: number; // _adjust booked on the closing date of a closed account (zero_closed), 0 if none
   ok: boolean;
   problems: string[];
 }
@@ -52,6 +53,7 @@ export interface ImportResult {
   unresolvedRows: SourceRow[];
   reconcile: Reconcile[];
   rounding: { sheet: string; diff: number }[];
+  zeroed: { account: string; date: string; amount: number }[];
   errors: string[];
 }
 
@@ -237,9 +239,14 @@ export function runImport(wb: Workbook, m: Mapping, ledger: Ledger | null): Impo
   const unmatched = m.unmatched_account ?? "import-unmatched";
   const res: ImportResult = {
     ok: false, source: m.source, rows: rows.length, transactions: [], accounts: [], skipped: 0, changed: [], replace: [], gone: [],
-    unpaired: [], unresolvedCategories: [], unresolvedRows: [], reconcile: [], rounding: [], errors,
+    unpaired: [], unresolvedCategories: [], unresolvedRows: [], reconcile: [], rounding: [], zeroed: [], errors,
   };
 
+  // account targets in categories / uncategorized must be accounts of the mapping or the ledger
+  const knownIds = new Set([...Object.values(m.accounts ?? {}).map((a) => a.id), ...(ledger?.accounts.map((a) => a.id) ?? [])]);
+  for (const v of [...Object.values(m.categories ?? {}), ...[...(m.rules ?? []), ...(m.uncategorized ?? [])].map((u) => u.category), m.uncategorized_in, m.uncategorized_out]) {
+    if (typeof v === "string" && v.startsWith("account:") && !knownIds.has(v.slice(8))) errors.push(`"${v}": no such account in the mapping's accounts or the ledger`);
+  }
   // accounts named in the file must be mapped
   const missingAcc = new Set(rows.filter((r) => !r.account).map((r) => r.sourceAccount));
   for (const a of missingAcc) errors.push(`source account "${a}" is not in the mapping's accounts`);
@@ -255,6 +262,14 @@ export function runImport(wb: Workbook, m: Mapping, ledger: Ledger | null): Impo
     if (tm) {
       r.kind = "transfer";
       r.wallet = (tm.groups?.wallet ?? "").trim();
+      continue;
+    }
+    const rule0 = (m.rules ?? []).find(
+      (u) => (!u.sign || (u.sign === "in") === r.cents > 0) && (!u.source_category || u.source_category === r.catKey || u.source_category === r.catKey?.split("/")[0]) && new RegExp(u.match, "iu").test(r.note),
+    );
+    if (rule0) {
+      r.kind = "category";
+      r.category = rule0.category;
       continue;
     }
     if (r.catKey !== null) {
@@ -307,7 +322,7 @@ export function runImport(wb: Workbook, m: Mapping, ledger: Ledger | null): Impo
       best.pairedWith = o;
     }
   }
-  res.unpaired = rows.filter((r) => r.kind === "transfer" && !r.pairedWith);
+  res.unpaired = rows.filter((r) => r.kind === "transfer" && !r.pairedWith && !(m.unpaired ?? []).some((u) => new RegExp(u.wallet, "iu").test(r.wallet ?? "")));
 
   // build transactions
   const built: Transaction[] = [];
@@ -325,7 +340,9 @@ export function runImport(wb: Workbook, m: Mapping, ledger: Ledger | null): Impo
   const stripTransfer = (note: string, re: RegExp | null) => (re ? note.replace(re, "").replace(/\s*\(\s*$/, "").trim() : note);
   for (const r of rows) {
     if (r.kind === "category") {
-      built.push(tx(r.key, r.date, r.time, r.note, [{ account: r.account, amount: r.amount }, { category: r.category!, amount: -r.amount }], { who: r.who, event: r.event, tags: r.tags }));
+      // "account:<id>" sends the other side to an account (a move between the owner's own accounts, not income or spending)
+      const other: Line = r.category!.startsWith("account:") ? { account: r.category!.slice(8), amount: -r.amount } : { category: r.category!, amount: -r.amount };
+      built.push(tx(r.key, r.date, r.time, r.note, [{ account: r.account, amount: r.amount }, other], { who: r.who, event: r.event, tags: r.tags }));
     } else if (r.kind === "transfer") {
       if (r.pairedWith) {
         if (r.cents > 0) continue; // built from the out side
@@ -333,7 +350,10 @@ export function runImport(wb: Workbook, m: Mapping, ledger: Ledger | null): Impo
         const note = stripTransfer(r.note, outRe) || stripTransfer(i.note, inRe) || "";
         built.push(tx(r.key, r.date, r.time, note, [{ account: r.account, amount: r.amount }, { account: i.account, amount: i.amount }], { who: r.who, event: r.event, tags: r.tags, src: { pair: i.key } }));
       } else {
-        built.push(tx(r.key, r.date, r.time, r.note, [{ account: r.account, amount: r.amount }, { account: unmatched, amount: -r.amount }], { who: r.who, event: r.event }));
+        const rule = (m.unpaired ?? []).find((u) => new RegExp(u.wallet, "iu").test(r.wallet ?? ""));
+        const target = rule?.category;
+        const other: Line = !target ? { account: unmatched, amount: -r.amount } : target.startsWith("account:") ? { account: target.slice(8), amount: -r.amount } : { category: target, amount: -r.amount };
+        built.push(tx(r.key, r.date, r.time, r.note, [{ account: r.account, amount: r.amount }, other], { who: r.who, event: r.event }));
       }
     }
   }
@@ -370,18 +390,26 @@ export function runImport(wb: Workbook, m: Mapping, ledger: Ledger | null): Impo
       built.push(tx(stableKey([m.source, sheetName, "rounding"]), last.date, "23:59", "Làm tròn khi nhập / import rounding", [{ account: acc, amount: diff }, { category: "_adjust", amount: -diff }], { src: { derived: "rounding" } }));
     }
     const imported = { opening, in: Math.round(inC / 100), out: Math.round(outC / 100), closing: opening + sumRounded + diff };
+    let zeroed = 0;
+    const closedOn = accMap[s.rows[0]?.sourceAccount ?? sheetName]?.closed;
+    if (m.zero_closed && closedOn && imported.closing !== 0) {
+      zeroed = -imported.closing;
+      res.zeroed.push({ account: acc, date: closedOn, amount: zeroed });
+      built.push(tx(stableKey([m.source, sheetName, "zero"]), closedOn, "23:59", "Về 0 khi tất toán / zeroed on closing", [{ account: acc, amount: zeroed }, { category: "_adjust", amount: -zeroed }], { src: { derived: "zero" } }));
+    }
     res.reconcile.push({
       sheet: sheetName, account: acc, rows: s.rows.length,
       source: { opening: t.opening, in: t.in, out: t.out, closing: t.closing },
-      imported, rounding: diff, ok: problems.length === 0, problems,
+      imported, rounding: diff, zeroed, ok: problems.length === 0, problems,
     });
   }
 
   // accounts to create
   const existing = new Set(ledger?.accounts.map((a) => a.id) ?? []);
   const made = new Set<string>();
+  const used = new Set(built.flatMap((t) => t.lines.map((l) => l.account).filter(Boolean) as string[]));
   for (const [, a] of Object.entries(accMap)) {
-    if (existing.has(a.id) || made.has(a.id)) continue;
+    if (existing.has(a.id) || made.has(a.id) || !used.has(a.id)) continue;
     made.add(a.id);
     const { names: _n, ...rest } = a;
     res.accounts.push({ ...rest, id: a.id, name: a.name ?? a.id, type: a.type ?? "other" } as Account);

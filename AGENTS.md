@@ -76,6 +76,15 @@ the mapping is written once, by you, on the first import. Later imports run it a
      so map the wallet as an account of that type.
    - **`uncategorized`:** rules (regex on the note, optional `sign: in|out`) for rows with no category that
      are not transfers. Don't assume every uncategorised row is a transfer.
+   - Any category target can be `account:<id>` instead: the row becomes a move to that account (loans given,
+     gold bought, savings and investments with no wallet of their own). Declare such accounts in `accounts` under
+     a key starting with `_`.
+   - **`rules`:** checked first on every non-transfer row, whatever its source category (e.g. the app's own
+     balance corrections → `_adjust`, so they never count as income or spending).
+   - **`skip_sheets`** leaves accounts out (e.g. a business account in a personal ledger); **`unpaired`**
+     (regex on the other wallet's name → category or `account:<id>`) says where transfers to it go.
+   - **`zero_closed: true`** books an `_adjust` on each closed account's closing date so it ends at 0, which clears the
+     source app's rounding leftovers. Only with the owner's go; they are listed in the report.
 3. Show the owner the account list (types, details) and the category map, and get their go.
 4. Run `npx ownledger import <file>`. It refuses unless every source account reconciles: opening + in − out
    must equal the source's closing balance, and every row must be imported, paired or listed. Amounts
