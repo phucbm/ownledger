@@ -80,6 +80,7 @@ export async function snapshot(env: Env, src: DataSource, sha?: string): Promise
 export interface Pending {
   baseSha: string;
   files: FileMap; // changed files
+  binary?: { path: string; base64: string }[]; // e.g. the raw export kept under imports/raw/
   message: string;
   summary: string[];
   created: string;
@@ -118,7 +119,11 @@ export async function applyPending(env: Env, src: DataSource, fp: string): Promi
   const snap = await snapshot(env, src, head);
   const r = checkFiles({ ...snap.files, ...p.files });
   if (!r.ok) throw new Error(`refused: the data would not pass check: ${r.errors[0]?.message}`);
-  const sha = await src.commit(p.baseSha, Object.entries(p.files).map(([path, content]) => ({ path, content })), p.message);
+  const sha = await src.commit(
+    p.baseSha,
+    [...Object.entries(p.files).map(([path, content]) => ({ path, content })), ...(p.binary ?? []).map((b) => ({ path: b.path, base64: b.base64 }))],
+    p.message,
+  );
   await env.OAUTH_KV.delete(PENDING + fp);
   return { sha, message: p.message, summary: p.summary };
 }

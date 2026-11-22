@@ -1,0 +1,61 @@
+:root {
+  color-scheme: light;
+  --surface-0: #f4f4f2;
+  --surface-1: #fcfcfb;
+  --border: #e3e2de;
+  --grid: #ecebe7;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #7c7b76;
+  --series-1: #2a78d6; /* income, net worth, magnitude */
+  --series-2: #eb6834; /* spending */
+  --good: #1f7a1f;
+  --critical: #c0392b;
+  --radius: 12px;
+}
+* { box-sizing: border-box; }
+body { margin: 0; font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--text-primary); background: var(--surface-0); }
+a { color: var(--series-1); text-decoration: none; }
+a:hover { text-decoration: underline; }
+.top { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; padding: .75rem 1.25rem; background: var(--surface-1); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 2; }
+.brand { font-weight: 700; color: var(--text-primary); }
+nav { display: flex; gap: .25rem; flex-wrap: wrap; flex: 1; }
+nav a { color: var(--text-secondary); padding: .3rem .6rem; border-radius: 8px; }
+nav a.on { background: var(--surface-0); color: var(--text-primary); }
+main { max-width: 1120px; margin: 0 auto; padding: 1.25rem; }
+h1 { font-size: 1.35rem; margin: .25rem 0 1rem; }
+h2 { font-size: 1.05rem; margin: 0 0 .75rem; }
+.muted { color: var(--text-muted); }
+.small { font-size: .85rem; }
+.grid { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.grid.two { grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); }
+.card { background: var(--surface-1); border: 1px solid var(--border); border-radius: var(--radius); padding: 1rem 1.1rem; min-width: 0; }
+.stat .label { color: var(--text-secondary); font-size: .85rem; }
+.stat .value { font-size: 1.6rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.stat .delta { font-size: .85rem; color: var(--text-secondary); }
+.num { font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
+.neg { color: var(--critical); }
+.pos { color: var(--good); }
+table { width: 100%; border-collapse: collapse; font-size: .92rem; }
+th, td { padding: .45rem .5rem; border-bottom: 1px solid var(--grid); text-align: left; vertical-align: top; }
+th { color: var(--text-secondary); font-weight: 600; font-size: .82rem; }
+tr.void td { color: var(--text-muted); text-decoration: line-through; }
+.filters { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; margin-bottom: 1rem; }
+input, select, button { font: inherit; padding: .4rem .6rem; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-1); color: var(--text-primary); }
+button { cursor: pointer; }
+button.primary { background: var(--text-primary); color: var(--surface-1); border-color: var(--text-primary); }
+button:disabled { opacity: .5; cursor: default; }
+.pill { display: inline-block; padding: 0 .45rem; border-radius: 999px; background: var(--surface-0); color: var(--text-secondary); font-size: .78rem; margin-right: .25rem; }
+.status { display: inline-flex; gap: .3rem; align-items: center; font-weight: 600; }
+.status.bad { color: var(--critical); }
+.status.ok { color: var(--good); }
+.legend { display: flex; gap: 1rem; font-size: .85rem; color: var(--text-secondary); margin-bottom: .4rem; }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: .35rem; vertical-align: -1px; }
+svg.chart { width: 100%; height: auto; display: block; overflow: visible; }
+svg.chart text { fill: var(--text-muted); font-size: 11px; font-family: inherit; }
+svg.chart .grid line { stroke: var(--grid); }
+.tip { position: fixed; pointer-events: none; background: var(--surface-1); border: 1px solid var(--border); border-radius: 8px; padding: .4rem .6rem; font-size: .85rem; box-shadow: 0 4px 16px rgba(0,0,0,.08); z-index: 10; }
+details.table summary { cursor: pointer; color: var(--text-secondary); font-size: .85rem; margin-top: .5rem; }
+.empty { padding: 2rem; text-align: center; color: var(--text-muted); }
+pre { white-space: pre-wrap; font-size: .82rem; background: var(--surface-0); padding: .6rem; border-radius: 8px; }
+@media (max-width: 640px) { .grid.two { grid-template-columns: 1fr; } .stat .value { font-size: 1.3rem; } main { padding: .75rem; } }
