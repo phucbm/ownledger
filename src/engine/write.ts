@@ -1,4 +1,4 @@
-import { isMap, isSeq, parseDocument, stringify } from "yaml";
+import { isMap, isPair, isScalar, isSeq, parseDocument, Scalar, stringify, visit, type Document } from "yaml";
 import { compareTx, ledgerPath, LEDGER_FILE_RE, parseJsonl, PATHS, type FileMap } from "./load.js";
 import type { Account, Issue, Price, Transaction } from "./types.js";
 
@@ -19,6 +19,31 @@ export interface Change {
 
 export function txLine(t: Transaction): string {
   return JSON.stringify(t);
+}
+
+/** Characters that change meaning in flow-style YAML ({ a: b, c }). Values with them are always double-quoted. */
+const FLOW_SPECIAL = /[,:{}\[\]#&*!|>'"%@`]/;
+
+/**
+ * Block style everywhere (one key per line) and quoted values where a hand edit into flow style would
+ * split them. Without this, "Đầu tư khác (chứng khoán, CCQ ngoài ví)" is cut at the comma when the file
+ * is next read in flow style.
+ */
+export function tidyYaml(doc: Document): void {
+  visit(doc, {
+    Map: (_, n) => void (n.flow = false),
+    Seq: (_, n) => void (n.flow = false),
+    Pair: (_, pair) => {
+      if (isPair(pair) && isScalar(pair.value) && typeof pair.value.value === "string" && FLOW_SPECIAL.test(pair.value.value)) pair.value.type = Scalar.QUOTE_DOUBLE;
+    },
+  });
+}
+
+/** stringify for data files: block style, quoted where needed. */
+export function yamlText(v: unknown): string {
+  const doc = parseDocument(stringify(v, { lineWidth: 0 }));
+  tidyYaml(doc);
+  return doc.toString({ lineWidth: 0 });
 }
 
 function upsertYamlList(text: string | undefined, items: { id: string; [k: string]: unknown }[], mergeOnly = false): string {
@@ -42,9 +67,8 @@ function upsertYamlList(text: string | undefined, items: { id: string; [k: strin
       throw new Error(`no item with id "${item.id}"`);
     }
   }
-  let out = doc.toString({ lineWidth: 0 });
-  if (out.startsWith("[]")) out = stringify(items, { lineWidth: 0 });
-  return out;
+  tidyYaml(doc);
+  return doc.toString({ lineWidth: 0 });
 }
 
 export function applyChange(files: FileMap, ch: Change): FileMap {

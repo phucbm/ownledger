@@ -13,6 +13,16 @@ import type { Env, Props } from "./env.js";
 import { MainMovedError } from "./github.js";
 import { applyPending, savePending, snapshot, sourceFor, type DataSource } from "./store.js";
 import { VERSION } from "./version.js";
+import { attention } from "../engine/attention.js";
+import { dashboardPath, defaultWidgets, GRID_COLS, poolOf, writeDashboard, type Dashboard, type Widget } from "../engine/dashboard.js";
+import { features } from "../engine/features.js";
+import { series, type SeriesQuery } from "../engine/insights.js";
+import { yamlText } from "../engine/write.js";
+import { dashboardOf } from "./api.js";
+import { cardList } from "../modules/cards/index.js";
+import { bestCard, cashback, closeOnOrAfter, feeWaiver, lineKind, nextClose, statements } from "../modules/cards/statements.js";
+import { cardsData, STATEMENTS_FILE, termsOf, recordFor } from "../modules/cards/terms.js";
+import { parse as parseYaml } from "yaml";
 
 type Result = { content: { type: "text"; text: string }[]; isError?: boolean };
 const out = (v: unknown): Result => ({ content: [{ type: "text", text: typeof v === "string" ? v : JSON.stringify(v) }] });
@@ -20,7 +30,9 @@ const fail = (msg: string): Result => ({ content: [{ type: "text", text: msg }],
 
 const INSTRUCTIONS = `ownledger: the owner's personal finance ledger, kept in their private GitHub repo.
 Amounts are whole numbers in the base currency (see about). Answers are computed here; never add up raw rows yourself when a tool computes it.
-Writes: the add_/edit_/void_ tools only PREVIEW. Show the owner the preview (what, amounts, accounts), wait for their explicit go, then call apply with the preview_id. Never invent an amount, date, account or category: ask. Call rules once before the first write.`;
+Writes: the add_/edit_/void_/set_/remove_ tools only PREVIEW. Show the owner the preview (what, amounts, accounts), wait for their explicit go, then call apply with the preview_id. Never invent an amount, date, account or category: ask. Call rules once before the first write.
+Dashboard: when the owner asks to "track", "watch" or "put on my dashboard" something, offer a widget (add_widget), using the categories and accounts from rules.
+Cards: for "which card should I use", call best_card; statements, cashback and fee waivers come from cards and card_statement.`;
 
 function compactTx(t: Transaction) {
   return {
@@ -51,7 +63,7 @@ const txFields = {
   note: z.string().optional(),
   kind: z.enum(["expense", "income", "transfer"]).optional().describe("simple form; or give lines"),
   amount: z.number().int().positive().optional().describe("simple form: positive, whole base-currency units"),
-  account: z.string().optional().describe("expense: paid from; income: received into; transfer: from"),
+  account: z.string().optional().describe("expense: paid from; income: received into; transfer: from. Omit to use the pool's default account (see rules)"),
   to_account: z.string().optional().describe("transfer: to"),
   category: z.string().optional().describe("category path, e.g. food/eating-out"),
   lines: z.array(lineSchema).optional().describe("full form: balanced lines (sum 0); for splits, assets with qty, etc."),
@@ -95,6 +107,14 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
     };
   };
 
+  /** The signed-in person's "My money" pool: how writes pick an account when none is named. */
+  const poolRule = (files: Record<string, string>, L: import("../engine/types.js").Ledger) => {
+    const p = poolOf(L, dashboardOf(files, props.login)?.prefs?.pool, now());
+    return p.on
+      ? { on: true, accounts: p.accounts, default_account: p.default_account, rule: `Everyday money (${p.accounts.join(", ")}) is one pool: when the owner doesn't name a wallet, spending and income go to ${p.default_account} and paying a card is one transfer ${p.default_account} → card. A named wallet ("paid by MoMo") is used as named.` }
+      : { on: false, rule: "Ask which account when it isn't named." };
+  };
+
   /* ---------------------------------------------------------------- read */
 
   server.registerTool("about", { description: "Version, data repo, last commit, base currency, counts, today's date.", annotations: ro }, wrap(async () => {
@@ -111,6 +131,7 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
       accounts: s.ledger.accounts.length,
       transactions: s.ledger.transactions.filter((t) => !t.void).length,
       check: { errors: s.errors, warnings: s.warnings },
+      dashboard: `data/dashboards/${props.login.toLowerCase()}.yaml (dashboard / add_widget tools)`,
     };
   }));
 
@@ -132,6 +153,7 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
         system: Object.entries(SYSTEM_CATEGORIES).map(([k, v]) => `${k}: ${v.en}`),
       },
       accounts: s.ledger.accounts.filter((a) => !a.closed).map((a) => `${a.id}: ${a.name} (${a.type})`),
+      pool: poolRule(s.files, s.ledger),
     };
   }));
 
@@ -249,10 +271,44 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
     }),
   );
 
-  server.registerTool("cards", { description: "Credit cards: owed, last statement, what to pay, due date, available credit.", inputSchema: z.object({ date: z.string().optional() }), annotations: ro }, wrap(async ({ date }) => {
+  server.registerTool("cards", { description: "Credit cards: owed, limit, last statement (to pay, due, paid or not), cashback this period, annual fee waiver, terms still missing.", inputSchema: z.object({ date: z.string().optional(), include_closed: z.boolean().optional() }), annotations: ro }, wrap(async ({ date, include_closed }) => {
     const s = await snap();
-    return cards(s.ledger, date ?? now()).filter((c) => c.owed !== 0 || (c.toPay ?? 0) > 0);
+    const asOf = date ?? now();
+    return cardList(s.ledger, asOf, { includeClosed: include_closed }).map((c) => ({
+      account: c.account,
+      name: c.name,
+      owed: c.owed,
+      limit: c.limit ?? (c.limitAtLeast ? `at least ${c.limitAtLeast} (most ever owed; limit not set)` : null),
+      last_statement: c.last ? { date: c.last.close, amount_due: c.last.amountDue, paid: c.last.paid, to_pay: c.last.toPay, due: c.last.due, status: c.last.status, ...(c.last.bank !== null ? { bank: c.last.bank, diff: c.last.bankDiff } : {}) } : null,
+      this_period: c.current ? { from: c.current.from, purchases: c.current.purchases } : null,
+      cashback: c.cashback ? { spend: c.cashback.spend, expected: c.cashback.expected, cap_left: c.cashback.capLeft, min_met: c.cashback.minMet, need_for_min: c.cashback.needForMin, ...(c.cashback.incomplete ? { note: "some rates not set" } : {}) } : null,
+      fee_waiver: feeWaiver(s.ledger, c.account, asOf),
+      ...(c.missing.length ? { missing: c.missing } : {}),
+    }));
   }));
+
+  server.registerTool(
+    "card_statement",
+    { description: "One card statement in detail (default: the last closed one): opening, purchases, refunds, cashback, fees, payments, closing, due, paid, and its transactions.", inputSchema: z.object({ account: z.string(), statement_date: z.string().optional().describe("yyyy-mm-dd") }), annotations: ro },
+    wrap(async ({ account, statement_date }) => {
+      const s = await snap();
+      const all = statements(s.ledger, account, now());
+      const st = statement_date ? all.find((x) => x.close === statement_date) : [...all].reverse().find((x) => !x.open);
+      if (!st) throw new A.ActionError(`no statement${statement_date ? ` on ${statement_date}` : ""} for ${account} (statement dates: ${all.slice(-6).map((x) => x.close).join(", ")})`);
+      const { map } = flattenCategories(s.ledger.categories);
+      const txs = s.ledger.transactions.filter((t) => !t.void && t.date >= st.from && t.date <= st.close && t.lines.some((l) => l.account === account));
+      return { statement: st, transactions: txs.map((t) => ({ ...compactTx(t), kind: lineKind(t, account, map)?.kind })), cashback: cashback(s.ledger, account, now()).find((p) => p.close === st.close) ?? null };
+    }),
+  );
+
+  server.registerTool(
+    "best_card",
+    { description: "Which card to use for a purchase: open cards ranked by cashback for the category (cap left, minimum spend), then interest-free days, then limit left, each with a one-line reason.", inputSchema: z.object({ category: z.string().describe("category path, e.g. food/groceries"), amount: z.number().int().positive().optional(), date: z.string().optional() }), annotations: ro },
+    wrap(async ({ category, amount, date }) => {
+      const s = await snap();
+      return bestCard(s.ledger, { category, amount, date: date ?? now() }).slice(0, 5);
+    }),
+  );
 
   server.registerTool("plans_due", { description: "Instalments, loan payments and premiums due in the next N days (and overdue), plus what's left per plan.", inputSchema: z.object({ days: z.number().int().max(366).optional() }), annotations: ro }, wrap(async ({ days }) => {
     const s = await snap();
@@ -269,7 +325,8 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
     const s = await snap();
     const t = today(s.ledger, now());
     const m = report(s.ledger, now().slice(0, 7), { compare: false });
-    return { ...t, this_month: { income: m.income, expense: m.expense } };
+    const needs = attention(s.ledger, now(), { files: s.files, check: { errors: s.errors, warnings: s.warnings } }).map((a) => ({ severity: a.severity, kind: a.kind, title: a.title, ...(a.amount !== undefined ? { amount: a.amount } : {}), date: a.date }));
+    return { ...t, needs_you: needs, this_month: { income: m.income, expense: m.expense } };
   }));
 
   /* ---------------------------------------------------------------- write (preview) */
@@ -283,7 +340,15 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
       inputSchema: z.object(txFields),
       annotations: pv,
     },
-    wrap(async (a) => preview((f) => A.addTransaction(f, a))),
+    wrap(async (a) => {
+      // with the pool on, an unnamed account is the pool's default account
+      if (!a.lines?.length && !a.account) {
+        const s = await snap();
+        const p = poolOf(s.ledger, dashboardOf(s.files, props.login)?.prefs?.pool, now());
+        if (p.on && p.default_account) a = { ...a, account: p.default_account };
+      }
+      return preview((f) => A.addTransaction(f, a));
+    }),
   );
 
   server.registerTool(
@@ -363,6 +428,166 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
     "edit_category",
     { description: "PREVIEW renaming a category, or moving it to a new path (every line using it is remapped).", inputSchema: z.object({ path: z.string(), name: z.string().optional(), new_path: z.string().optional() }), annotations: pv },
     wrap(async ({ path, ...set }) => preview((f) => A.editCategory(f, path, set))),
+  );
+
+  /* ---------------------------------------------------------------- cards (preview) */
+
+  server.registerTool(
+    "set_card_details",
+    {
+      description: "PREVIEW card terms on a credit card account: statement and due days, limit, annual fee and its month, fee waiver target, cashback rules. Only the fields given change; they're kept over codes read from wallet names.",
+      inputSchema: z.object({
+        account: z.string(),
+        statement_day: z.number().int().min(1).max(31).optional(),
+        due_day: z.number().int().min(1).max(31).optional(),
+        limit: z.number().int().positive().optional(),
+        annual_fee: z.number().int().min(0).optional(),
+        fee_month: z.number().int().min(1).max(12).optional(),
+        fee_waiver_spend: z.number().int().positive().optional().describe("spend per card year that waives the annual fee"),
+        free_days_max: z.number().int().optional(),
+        cashback: z.object({
+          base: z.number().min(0).max(100).optional(),
+          rules: z.array(z.object({ categories: z.array(z.string()), rate: z.number().min(0).max(100) })).optional(),
+          cap: z.object({ amount: z.number().int().positive(), per: z.enum(["statement", "month"]) }).optional(),
+          min_spend: z.object({ amount: z.number().int().positive(), per: z.enum(["statement", "month"]) }).optional(),
+          spend_max: z.object({ amount: z.number().int().positive(), per: z.enum(["statement", "month"]) }).optional(),
+          paid_on: z.string().optional().describe("next_statement or days_after:<n>"),
+        }).optional().describe("merged into the card's cashback terms"),
+      }),
+      annotations: pv,
+    },
+    wrap(async ({ account, fee_waiver_spend, cashback: cb, ...rest }) =>
+      preview((f) => {
+        const { ledger } = A.loadForAction(f);
+        const a = ledger.accounts.find((x) => x.id === account);
+        if (!a) throw new A.ActionError(`no account ${account}`);
+        const details: Record<string, unknown> = { ...(a.details ?? {}) };
+        const set: Record<string, unknown> = Object.fromEntries(Object.entries(rest).filter(([, v]) => v !== undefined));
+        if (fee_waiver_spend !== undefined) set.fee_waiver = { spend: fee_waiver_spend, within: "year" };
+        if (cb) set.cashback = { ...((details.cashback as object) ?? {}), ...Object.fromEntries(Object.entries(cb).filter(([, v]) => v !== undefined)) };
+        if (!Object.keys(set).length) throw new A.ActionError("nothing to change");
+        Object.assign(details, set);
+        const fromName = Array.isArray(details.from_name) ? (details.from_name as string[]).filter((k) => !(k in set)) : undefined;
+        if (fromName) details.from_name = fromName.length ? fromName : undefined;
+        if (details.from_name === undefined) delete details.from_name;
+        return A.editAccount(f, account, { details });
+      }),
+    ),
+  );
+
+  server.registerTool(
+    "add_statement_amount",
+    { description: "PREVIEW the bank's amount for a card statement (from the bank's statement), to compare with the computed one.", inputSchema: z.object({ account: z.string(), statement_date: z.string().describe("yyyy-mm-dd, the statement's closing date"), amount: z.number().int() }), annotations: pv },
+    wrap(async ({ account, statement_date, amount }) =>
+      preview((f) => {
+        const { ledger } = A.loadForAction(f);
+        if (!ledger.accounts.some((a) => a.id === account)) throw new A.ActionError(`no account ${account}`);
+        const list = cardsData(ledger).statements.filter((x) => !(x.account === account && x.statement_date === statement_date));
+        list.push({ account, statement_date, amount });
+        list.sort((x, y) => (x.statement_date < y.statement_date ? -1 : x.statement_date > y.statement_date ? 1 : x.account < y.account ? -1 : 1));
+        return A.plan(f, { putFiles: { [STATEMENTS_FILE]: yamlText(list) } }, `Card statement: ${account} ${statement_date}`);
+      }),
+    ),
+  );
+
+  server.registerTool(
+    "add_instalment",
+    { description: "PREVIEW turning a card purchase into a 0% instalment plan (trả góp 0%): each statement then counts only the monthly amount.", inputSchema: z.object({ transaction: z.string().describe("id of the purchase on the card"), count: z.number().int().min(2).max(60), fee: z.number().int().min(0).optional().describe("conversion fee per month, if any"), id: z.string().optional(), name: z.string().optional(), first_statement: z.string().optional().describe("yyyy-mm-dd; default the first statement after the purchase") }), annotations: pv },
+    wrap(async ({ transaction, count, fee, id, name, first_statement }) =>
+      preview((f) => {
+        const { ledger } = A.loadForAction(f);
+        const t = ledger.transactions.find((x) => x.id === transaction);
+        if (!t) throw new A.ActionError(`no transaction ${transaction}`);
+        const line = t.lines.find((l) => l.account && ledger.accounts.find((a) => a.id === l.account)?.type === "credit_card" && l.amount < 0);
+        if (!line) throw new A.ActionError("that transaction isn't a purchase on a credit card");
+        const acc = ledger.accounts.find((a) => a.id === line.account)!;
+        const sd = termsOf(acc, recordFor(ledger, acc.id)).statementDay;
+        if (!sd && !first_statement) throw new A.ActionError(`${acc.id} has no statement_day: give first_statement`);
+        const start = first_statement ?? closeOnOrAfter(t.date, sd!);
+        const principal = -line.amount;
+        return A.addPlan(f, { id: id ?? `${acc.id}-${t.date.replace(/-/g, "")}-0pct`, kind: "instalment", account: acc.id, name: name ?? (t.note || `Trả góp ${acc.name}`), principal, count, every: "month", start, ...(fee ? { fee } : {}), rate: 0, source: t.id });
+      }),
+    ),
+  );
+
+  /* ---------------------------------------------------------------- dashboard (preview) */
+
+  const queryShape = z.object({
+    metric: z.enum(["spending", "income", "net", "balance", "count"]),
+    category: z.string().optional(),
+    account: z.string().optional(),
+    who: z.string().optional(),
+    event: z.string().optional(),
+    tag: z.string().optional(),
+    text: z.string().optional(),
+    period: z.string().optional().describe("this-month, last-month, last-3-months, last-6-months, this-year, last-year, last-12-months, all, yyyy-mm or yyyy"),
+    by: z.enum(["day", "week", "month", "category", "top", "account", "who", "event", "tag"]).optional(),
+    compare: z.enum(["previous", "usual"]).optional(),
+  });
+
+  const myDashboard = async () => {
+    const s = await snap();
+    const d = dashboardOf(s.files, props.login);
+    const widgets: Widget[] = d?.widgets ?? defaultWidgets(features(s.ledger, now(), s.files));
+    return { s, d: { version: 1, ...(d ?? {}), widgets } as Dashboard & { widgets: Widget[] } };
+  };
+  const saveLayout = (d: Dashboard, message: string) => (f: Record<string, string>) => A.plan(f, { putFiles: { [dashboardPath(props.login)]: writeDashboard(d) } }, message);
+  const firstNumbers = async (q: SeriesQuery) => {
+    const s = await snap();
+    const pool = poolOf(s.ledger, dashboardOf(s.files, props.login)?.prefs?.pool, now());
+    const r = series(s.ledger, q.account === "pool" ? { ...q, account: pool.accounts } : q, now());
+    return { period: r.period, total: r.total, ...(r.compareTotal !== undefined ? { compare: r.compareTotal } : {}), first: r.points.slice(0, 8).map((p) => [p.name, p.value]) };
+  };
+
+  server.registerTool("dashboard", { description: "The signed-in owner's dashboard layout: widgets with ids, types, titles, queries and positions (12-column grid), from data/dashboards/<login>.yaml (defaults when there is no file yet).", annotations: ro }, wrap(async () => {
+    const { s, d } = await myDashboard();
+    return { file: dashboardPath(props.login), saved: Boolean(dashboardOf(s.files, props.login)), grid_columns: GRID_COLS, widgets: d.widgets };
+  }));
+
+  server.registerTool(
+    "add_widget",
+    {
+      description: "PREVIEW adding a widget to the owner's dashboard: a chart from a query (type chart), or a built-in widget by type (pace, left, attention, unusual, net_worth, by_category, income_spending, recent, account, upcoming, cards, cashback, which_card, cards_value, deposits). Shows the first numbers so the owner can see it's right.",
+      inputSchema: z.object({ type: z.string().default("chart"), title: z.string().max(80).optional(), query: queryShape.optional(), chart: z.enum(["stat", "line", "bar", "hbar", "table"]).optional(), account: z.string().optional(), period: z.string().optional(), w: z.number().int().min(1).max(12).optional(), h: z.number().int().min(1).max(24).optional(), id: z.string().optional() }),
+      annotations: pv,
+    },
+    wrap(async ({ type, title, query, chart, account, period, w, h, id }) => {
+      const { d } = await myDashboard();
+      if (type === "chart" && !query) throw new A.ActionError("a chart widget needs a query");
+      const y = d.widgets.reduce((m, x) => Math.max(m, x.y + x.h), 0);
+      const base = (id ?? title ?? type).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/đ/gi, "d").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "widget";
+      let wid = base;
+      for (let i = 2; d.widgets.some((x) => x.id === wid); i++) wid = `${base}-${i}`;
+      const widget: Widget = { id: wid, type, x: 0, y, w: w ?? 6, h: h ?? 3, ...(title ? { title } : {}), ...(query ? { query: query as SeriesQuery, chart: chart ?? "bar" } : {}), ...(account ? { account } : {}), ...(period ? { period } : {}), by_ai: true };
+      const next: Dashboard = { ...d, widgets: [...d.widgets, widget] };
+      const shows = query ? await firstNumbers(query as SeriesQuery) : undefined;
+      return { ...(await preview(saveLayout(next, `Dashboard: add widget ${title ?? type} (${props.login})`))), widget, ...(shows ? { shows } : {}) };
+    }),
+  );
+
+  server.registerTool(
+    "edit_widget",
+    { description: "PREVIEW changing a dashboard widget by id (title, query, chart kind, size, options).", inputSchema: z.object({ id: z.string(), title: z.string().max(80).optional(), query: queryShape.optional(), chart: z.enum(["stat", "line", "bar", "hbar", "table"]).optional(), account: z.string().optional(), period: z.string().optional(), w: z.number().int().min(1).max(12).optional(), h: z.number().int().min(1).max(24).optional() }), annotations: pv },
+    wrap(async ({ id, ...set }) => {
+      const { d } = await myDashboard();
+      const w = d.widgets.find((x) => x.id === id);
+      if (!w) throw new A.ActionError(`no widget ${id} (ids: ${d.widgets.map((x) => x.id).join(", ")})`);
+      const changed = { ...w, ...Object.fromEntries(Object.entries(set).filter(([, v]) => v !== undefined)) } as Widget;
+      if (changed.x + changed.w > GRID_COLS) changed.x = GRID_COLS - changed.w;
+      const next: Dashboard = { ...d, widgets: d.widgets.map((x) => (x.id === id ? changed : x)) };
+      const shows = changed.query ? await firstNumbers(changed.query) : undefined;
+      return { ...(await preview(saveLayout(next, `Dashboard: edit widget ${id} (${props.login})`))), widget: changed, ...(shows ? { shows } : {}) };
+    }),
+  );
+
+  server.registerTool(
+    "remove_widget",
+    { description: "PREVIEW removing a dashboard widget by id.", inputSchema: z.object({ id: z.string() }), annotations: pv },
+    wrap(async ({ id }) => {
+      const { d } = await myDashboard();
+      if (!d.widgets.some((x) => x.id === id)) throw new A.ActionError(`no widget ${id} (ids: ${d.widgets.map((x) => x.id).join(", ")})`);
+      return preview(saveLayout({ ...d, widgets: d.widgets.filter((x) => x.id !== id) }, `Dashboard: remove widget ${id} (${props.login})`));
+    }),
   );
 
   /* ---------------------------------------------------------------- apply */

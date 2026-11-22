@@ -40,6 +40,14 @@ export function importReport(r: ImportResult, verbose = false): string {
     for (const u of r.unresolvedRows.slice(0, 50)) out.push(`  - ${u.sheet} row ${u.row}: ${u.date} ${n(u.amount)} "${u.note}"`);
   }
   if (r.replace.length) out.push("", `Derived opening/rounding transactions updated: ${r.replace.length}`);
+  if (r.accountUpdates.length) {
+    out.push("", `Card terms read from wallet names (your own values are kept), ${r.accountUpdates.length}:`);
+    for (const u of r.accountUpdates) out.push(`  - ${u.id}: ${JSON.stringify(Object.fromEntries(Object.entries(u.set.details as Record<string, unknown>).filter(([k]) => k !== "from_name")))}`);
+  }
+  if (r.nameWarnings.length) {
+    out.push("", `! Codes in wallet names that couldn't be read (nothing guessed, ${r.nameWarnings.length}):`);
+    for (const w of r.nameWarnings) out.push(`  - ${w}`);
+  }
   if (r.changed.length) {
     out.push("", `! Rows already imported whose content changed in the source (not applied; decide by hand, ${r.changed.length}):`);
     for (const c of r.changed.slice(0, 30)) out.push(`  - ${c.id}: was ${c.was} now ${c.now}`);
@@ -106,7 +114,7 @@ export async function cmdImport(args: string[]): Promise<number> {
   const r = runImport(wb, mapping, ledger);
   console.log(importReport(r, args.includes("--verbose")));
   if (!r.ok) return 1;
-  if (!r.transactions.length && !r.accounts.length && !r.replace.length) {
+  if (!r.transactions.length && !r.accounts.length && !r.replace.length && !r.accountUpdates.length) {
     console.log("Nothing new to import.");
     return 0;
   }
@@ -116,7 +124,7 @@ export async function cmdImport(args: string[]): Promise<number> {
   }
 
   // write: build the new files in memory, check them, then write and commit
-  const change = applyChange(files, { addAccounts: r.accounts, addTransactions: r.transactions, replaceTransactions: r.replace });
+  const change = applyChange(files, { addAccounts: r.accounts, updateAccounts: r.accountUpdates, addTransactions: r.transactions, replaceTransactions: r.replace });
   const result = checkFiles({ ...files, ...change });
   if (!result.ok) {
     console.log("\n✗ The data would not pass check after this import; nothing written:");

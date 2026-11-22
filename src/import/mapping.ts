@@ -86,6 +86,8 @@ export function parseMapping(text: string): Mapping {
   return m;
 }
 
+const ACCOUNT_KEYS = new Set(["id", "name", "type", "asset", "opened", "closed", "group", "details", "names", "note"]);
+
 export function validateMapping(m: Mapping): string[] {
   const e: string[] = [];
   if (!m || typeof m !== "object") return ["not a YAML map"];
@@ -99,6 +101,10 @@ export function validateMapping(m: Mapping): string[] {
   else
     for (const [k, a] of Object.entries(m.accounts)) {
       if (!a || typeof a.id !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(a.id)) e.push(`accounts["${k}"].id: letters, digits, . _ - only`);
+      // { name: A (b, c) } in flow style parses as name "A (b" plus a key "c)" with no value: the name was cut at a comma
+      for (const [key, v] of Object.entries(a ?? {})) {
+        if (v === null && !ACCOUNT_KEYS.has(key)) e.push(`accounts["${k}"]: "${key}" has no value; a name with a comma was probably cut. Quote it: name: "…"`);
+      }
     }
   if (!m.categories || typeof m.categories !== "object") e.push("categories: map of source category → ownledger category");
   for (const key of ["out", "in"] as const) {

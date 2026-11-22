@@ -11,3 +11,8 @@ export * from "./schedules.js";
 export * from "./defaults.js";
 export * from "./write.js";
 export * from "./actions.js";
+export * from "./insights.js";
+export * from "./features.js";
+export * from "./attention.js";
+export * from "./dashboard.js";
+export { MODULES, moduleByName } from "../modules/index.js";

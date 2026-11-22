@@ -49,7 +49,7 @@ const call = async (name, args = {}) => {
 };
 const about = await call("about");
 console.log(`✓ about (${about.ms} ms):`, JSON.stringify(about.v));
-for (const [n, a] of [["today", {}], ["report", { period: about.v.today.slice(0, 4) }], ["accounts", {}], ["net_worth", { months: 12 }], ["cards", {}], ["plans_due", {}], ["deposits", {}], ["transactions", { text: "an", limit: 3 }]]) {
+for (const [n, a] of [["today", {}], ["report", { period: about.v.today.slice(0, 4) }], ["accounts", {}], ["net_worth", { months: 12 }], ["cards", {}], ["plans_due", {}], ["deposits", {}], ["transactions", { text: "an", limit: 3 }], ["dashboard", {}], ["best_card", { category: "food" }]]) {
   const r = await call(n, a);
   console.log(`✓ ${n} (${r.ms} ms): ${JSON.stringify(r.v).slice(0, 160)}`);
 }

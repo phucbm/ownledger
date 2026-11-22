@@ -3,6 +3,9 @@ import { isDate } from "./dates.js";
 import { ledgerPath, loadLedger, PATHS, type FileMap } from "./load.js";
 import { typeDef } from "./registry.js";
 import { FORMAT, type Issue, type Ledger } from "./types.js";
+import { checkDashboards } from "./dashboard.js";
+import { todayIn } from "./dates.js";
+import { MODULES } from "../modules/index.js";
 
 const ID_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 const EVERY = new Set(["month", "quarter", "year"]);
@@ -17,7 +20,9 @@ export interface CheckResult {
 /** Load + check. `ok` is false when there is any error. Warnings never fail. */
 export function checkFiles(files: FileMap): CheckResult {
   const { ledger, issues } = loadLedger(files);
-  const all = [...issues, ...checkLedger(ledger)];
+  const asOf = todayIn();
+  const all = [...issues, ...checkLedger(ledger), ...checkDashboards(files, ledger)];
+  for (const m of MODULES) if (m.check && m.on(ledger, asOf, files)) all.push(...m.check(ledger, files));
   const errors = all.filter((i) => i.level === "error");
   const warnings = all.filter((i) => i.level === "warning");
   return { ok: errors.length === 0, errors, warnings, ledger };
