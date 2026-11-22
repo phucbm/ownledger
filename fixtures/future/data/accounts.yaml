@@ -1,0 +1,19 @@
+- id: cash
+  name: Cash
+  type: cash
+- id: pension
+  name: Voluntary pension
+  type: pension_fund
+  details:
+    provider: Future Co
+    vesting_year: 2045
+- id: card
+  name: Card
+  type: credit_card
+  details:
+    statement_day: 25
+    due_day: 10
+    limit: 20000000
+    cashback_tier: gold
+    reward_points: 1200
+  colour: "#123456"

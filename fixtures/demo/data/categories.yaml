@@ -1,0 +1,87 @@
+income:
+  - id: salary
+    name: Lương
+  - id: freelance
+    name: Làm thêm
+  - id: interest
+    name: Lãi & cổ tức
+  - id: cashback
+    name: Hoàn tiền & khuyến mãi
+  - id: gifts-received
+    name: Được tặng
+  - id: other-income
+    name: Thu khác
+expense:
+  - id: food
+    name: Ăn uống
+    children:
+      - id: eating-out
+        name: Ăn ngoài
+      - id: cafe
+        name: Cafe
+      - id: groceries
+        name: Đi chợ
+  - id: transport
+    name: Đi lại
+    children:
+      - id: fuel
+        name: Xăng
+      - id: fares
+        name: Vé xe & gửi xe
+      - id: vehicle
+        name: Sửa xe
+  - id: home
+    name: Nhà cửa
+    children:
+      - id: electricity
+        name: Điện nước
+      - id: internet
+        name: Internet
+      - id: repairs
+        name: Sửa chữa
+      - id: household
+        name: Đồ gia dụng
+      - id: plants
+        name: Cây cảnh
+  - id: family
+    name: Gia đình
+    children:
+      - id: parents
+        name: Bố mẹ
+      - id: gifts-weddings
+        name: Quà & đám cưới
+  - id: health
+    name: Sức khoẻ & thể thao
+    children:
+      - id: sport
+        name: Thể thao
+      - id: medical
+        name: Khám chữa bệnh
+      - id: personal-care
+        name: Chăm sóc cá nhân
+      - id: insurance
+        name: Phí bảo hiểm
+  - id: shopping
+    name: Mua sắm
+    children:
+      - id: clothes
+        name: Quần áo
+      - id: big-purchases
+        name: Đồ lớn
+  - id: fun
+    name: Giải trí & du lịch
+    children:
+      - id: entertainment
+        name: Giải trí
+      - id: trips
+        name: Du lịch
+  - id: learning
+    name: Học tập
+  - id: work-tools
+    name: Công cụ làm việc
+  - id: subscriptions
+    name: Điện thoại & dịch vụ
+  - id: bank-fees
+    name: Phí & lãi ngân hàng
+  - id: other
+    name: Chi khác

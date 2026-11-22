@@ -1,0 +1,4 @@
+format: 1
+base: VND
+locale: en
+some_future_setting: true

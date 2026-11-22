@@ -1,0 +1,24 @@
+- id: VND
+  name: Việt Nam đồng
+  kind: currency
+  decimals: 0
+- id: GOLD_CHI
+  name: Vàng nhẫn 9999
+  kind: gold
+  unit: chỉ
+- id: VESAF
+  name: Quỹ VESAF
+  kind: fund
+  unit: ccq
+- id: FPT
+  name: FPT
+  kind: stock
+  unit: cp
+- id: E1VFVN30
+  name: E1VFVN30
+  kind: etf
+  unit: ccq
+- id: BTC
+  name: Bitcoin
+  kind: crypto
+  unit: BTC

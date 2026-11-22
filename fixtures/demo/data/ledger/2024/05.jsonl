@@ -1,0 +1,25 @@
+{"id":"t_demo00370","date":"2024-05-03","time":null,"note":"Ăn trưa","lines":[{"account":"cash","amount":-32000},{"category":"transport/fares","amount":32000}]}
+{"id":"t_demo00364","date":"2024-05-04","time":null,"note":"Cafe sáng","lines":[{"account":"card-visa","amount":-86000},{"category":"transport/fuel","amount":86000}]}
+{"id":"t_demo00354","date":"2024-05-05","time":null,"note":"Thanh toán thẻ Visa","lines":[{"account":"vcb","amount":-942000},{"account":"card-visa","amount":942000}]}
+{"id":"t_demo00355","date":"2024-05-05","time":null,"note":"Lương tháng","lines":[{"account":"vcb","amount":33000000},{"category":"salary","amount":-33000000}]}
+{"id":"t_demo00360","date":"2024-05-06","time":null,"note":"Rút tiền mặt","lines":[{"account":"vcb","amount":-4000000},{"account":"cash","amount":4000000}]}
+{"id":"t_demo00361","date":"2024-05-06","time":null,"note":"Nạp MoMo","lines":[{"account":"vcb","amount":-2000000},{"account":"momo","amount":2000000}]}
+{"id":"t_demo00357","date":"2024-05-08","time":null,"note":"Tiền điện","lines":[{"account":"vcb","amount":-1038000},{"category":"home/electricity","amount":1038000}],"who":null}
+{"id":"t_demo00358","date":"2024-05-09","time":null,"note":"Internet","lines":[{"account":"vcb","amount":-250000},{"category":"home/internet","amount":250000}]}
+{"id":"t_demo00369","date":"2024-05-09","time":null,"note":"Ăn trưa","lines":[{"account":"cash","amount":-15000},{"category":"transport/fares","amount":15000}]}
+{"id":"t_demo00374","date":"2024-05-09","time":null,"note":"Gửi xe","lines":[{"account":"cash","amount":-157000},{"category":"food/eating-out","amount":157000}]}
+{"id":"t_demo00352","date":"2024-05-10","time":null,"note":"Trả SPayLater","lines":[{"account":"vcb","amount":-1543000},{"account":"spaylater","amount":1543000}]}
+{"id":"t_demo00359","date":"2024-05-10","time":null,"note":"Gửi bố mẹ","lines":[{"account":"vcb","amount":-3000000},{"category":"family/parents","amount":3000000}],"who":"Bố mẹ"}
+{"id":"t_demo00366","date":"2024-05-10","time":null,"note":"Ăn trưa","lines":[{"account":"cash","amount":-208000},{"category":"food/eating-out","amount":208000}]}
+{"id":"t_demo00362","date":"2024-05-11","time":null,"note":"Đổ xăng","lines":[{"account":"cash","amount":-379000},{"category":"food/groceries","amount":379000}]}
+{"id":"t_demo00367","date":"2024-05-11","time":null,"note":"Đổ xăng","lines":[{"account":"momo","amount":-52000},{"category":"food/cafe","amount":52000}]}
+{"id":"t_demo00372","date":"2024-05-11","time":null,"note":"food/groceries","lines":[{"account":"cash","amount":-225000},{"category":"food/groceries","amount":225000}]}
+{"id":"t_demo00368","date":"2024-05-13","time":null,"note":"Đổ xăng","lines":[{"account":"card-visa","amount":-387000},{"category":"food/groceries","amount":387000}]}
+{"id":"t_demo00375","date":"2024-05-13","time":null,"note":"Đổ xăng","lines":[{"account":"card-visa","amount":-349000},{"category":"food/groceries","amount":349000}]}
+{"id":"t_demo00365","date":"2024-05-14","time":null,"note":"Gửi xe","lines":[{"account":"card-visa","amount":-40000},{"category":"food/cafe","amount":40000}]}
+{"id":"t_demo00376","date":"2024-05-16","time":null,"note":"Mua CCQ VESAF","lines":[{"account":"vcb","amount":-1999919},{"account":"fund-vesaf","asset":"VESAF","qty":82.22,"amount":1999919}]}
+{"id":"t_demo00363","date":"2024-05-17","time":null,"note":"Đổ xăng","lines":[{"account":"cash","amount":-65000},{"category":"food/cafe","amount":65000}]}
+{"id":"t_demo00356","date":"2024-05-18","time":null,"note":"Dự án làm thêm","lines":[{"account":"vcb","amount":4800000},{"category":"freelance","amount":-4800000}]}
+{"id":"t_demo00371","date":"2024-05-20","time":null,"note":"food/groceries","lines":[{"account":"momo","amount":-533000},{"category":"food/groceries","amount":533000}]}
+{"id":"t_demo01118","date":"2024-05-20","time":null,"note":"Mua 100 FPT","lines":[{"account":"vcb","amount":-10042200},{"account":"stock-fpt","asset":"FPT","qty":100,"amount":10042200}]}
+{"id":"t_demo00373","date":"2024-05-26","time":null,"note":"food/cafe","lines":[{"account":"card-visa","amount":-49000},{"category":"food/cafe","amount":49000}]}

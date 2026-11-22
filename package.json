@@ -1,0 +1,55 @@
+{
+  "name": "ownledger",
+  "version": "0.0.0",
+  "description": "Personal finance ledger used through AI chat (MCP). Your data in your own private GitHub repo, served by your own Cloudflare Worker.",
+  "license": "MIT",
+  "author": "phucbm",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/phucbm/ownledger.git"
+  },
+  "homepage": "https://github.com/phucbm/ownledger#readme",
+  "keywords": [
+    "finance",
+    "ledger",
+    "mcp",
+    "cloudflare-workers",
+    "personal-finance"
+  ],
+  "type": "module",
+  "packageManager": "pnpm@10.22.0",
+  "engines": {
+    "node": ">=20"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/engine/index.d.ts",
+      "default": "./dist/engine/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "assets",
+    "templates",
+    "AGENTS.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && chmod +x dist/cli/index.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "fixtures": "tsx scripts/make-fixtures.ts"
+  },
+  "dependencies": {
+    "yaml": "2.9.1"
+  },
+  "devDependencies": {
+    "@types/node": "26.6.6",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vitest": "5.1.1"
+  },
+  "bin": {
+    "ownledger": "./dist/cli/index.js"
+  }
+}

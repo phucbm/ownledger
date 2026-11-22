@@ -1,0 +1,23 @@
+{"id":"t_demo00160","date":"2023-08-01","time":null,"note":"food/cafe","lines":[{"account":"cash","amount":-76000},{"category":"food/cafe","amount":76000}]}
+{"id":"t_demo00162","date":"2023-08-01","time":null,"note":"Gửi xe","lines":[{"account":"card-visa","amount":-70000},{"category":"transport/fuel","amount":70000}]}
+{"id":"t_demo00165","date":"2023-08-04","time":null,"note":"Gửi xe","lines":[{"account":"card-visa","amount":-88000},{"category":"transport/fuel","amount":88000}]}
+{"id":"t_demo00171","date":"2023-08-04","time":null,"note":"Cafe sáng","lines":[{"account":"momo","amount":-66000},{"category":"food/cafe","amount":66000}]}
+{"id":"t_demo00151","date":"2023-08-05","time":null,"note":"Thanh toán thẻ Visa","lines":[{"account":"vcb","amount":-1253000},{"account":"card-visa","amount":1253000}]}
+{"id":"t_demo00152","date":"2023-08-05","time":null,"note":"Lương tháng","lines":[{"account":"vcb","amount":30000000},{"category":"salary","amount":-30000000}]}
+{"id":"t_demo00157","date":"2023-08-06","time":null,"note":"Rút tiền mặt","lines":[{"account":"vcb","amount":-4000000},{"account":"cash","amount":4000000}]}
+{"id":"t_demo00158","date":"2023-08-06","time":null,"note":"Nạp MoMo","lines":[{"account":"vcb","amount":-2000000},{"account":"momo","amount":2000000}]}
+{"id":"t_demo00161","date":"2023-08-07","time":null,"note":"Gửi xe","lines":[{"account":"cash","amount":-325000},{"category":"food/groceries","amount":325000}]}
+{"id":"t_demo00154","date":"2023-08-08","time":null,"note":"Tiền điện","lines":[{"account":"vcb","amount":-741000},{"category":"home/electricity","amount":741000}],"who":null}
+{"id":"t_demo00159","date":"2023-08-08","time":null,"note":"Ăn trưa","lines":[{"account":"momo","amount":-377000},{"category":"food/groceries","amount":377000}]}
+{"id":"t_demo00172","date":"2023-08-08","time":null,"note":"Đổ xăng","lines":[{"account":"momo","amount":-79000},{"category":"food/eating-out","amount":79000}]}
+{"id":"t_demo00155","date":"2023-08-09","time":null,"note":"Internet","lines":[{"account":"vcb","amount":-250000},{"category":"home/internet","amount":250000}]}
+{"id":"t_demo00156","date":"2023-08-10","time":null,"note":"Gửi bố mẹ","lines":[{"account":"vcb","amount":-3000000},{"category":"family/parents","amount":3000000}],"who":"Bố mẹ"}
+{"id":"t_demo00166","date":"2023-08-12","time":null,"note":"Đi chợ","lines":[{"account":"card-visa","amount":-200000},{"category":"food/eating-out","amount":200000}]}
+{"id":"t_demo00173","date":"2023-08-12","time":null,"note":"Du lịch Đà Lạt","lines":[{"account":"vcb","amount":-6448000},{"category":"fun/trips","amount":6448000}],"event":"Đà Lạt 2023"}
+{"id":"t_demo00153","date":"2023-08-18","time":null,"note":"Dự án làm thêm","lines":[{"account":"vcb","amount":4700000},{"category":"freelance","amount":-4700000}]}
+{"id":"t_demo00170","date":"2023-08-21","time":null,"note":"Đi chợ","lines":[{"account":"cash","amount":-42000},{"category":"transport/fares","amount":42000}]}
+{"id":"t_demo00163","date":"2023-08-24","time":null,"note":"Cafe sáng","lines":[{"account":"cash","amount":-165000},{"category":"food/groceries","amount":165000}]}
+{"id":"t_demo00164","date":"2023-08-24","time":null,"note":"Gửi xe","lines":[{"account":"momo","amount":-89000},{"category":"transport/fuel","amount":89000}]}
+{"id":"t_demo00169","date":"2023-08-28","time":null,"note":"Đổ xăng","lines":[{"account":"momo","amount":-48000},{"category":"transport/fares","amount":48000}]}
+{"id":"t_demo00168","date":"2023-08-29","time":null,"note":"Ăn trưa","lines":[{"account":"momo","amount":-78000},{"category":"transport/fuel","amount":78000}]}
+{"id":"t_demo00167","date":"2023-08-30","time":null,"note":"Gửi xe","lines":[{"account":"cash","amount":-144000},{"category":"food/eating-out","amount":144000}]}

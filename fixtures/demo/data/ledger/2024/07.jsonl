@@ -1,0 +1,25 @@
+{"id":"t_demo00399","date":"2024-07-05","time":null,"note":"Thanh toán thẻ Visa","lines":[{"account":"vcb","amount":-913000},{"account":"card-visa","amount":913000}]}
+{"id":"t_demo00400","date":"2024-07-05","time":null,"note":"Lương tháng","lines":[{"account":"vcb","amount":33000000},{"category":"salary","amount":-33000000}]}
+{"id":"t_demo00404","date":"2024-07-06","time":null,"note":"Rút tiền mặt","lines":[{"account":"vcb","amount":-4000000},{"account":"cash","amount":4000000}]}
+{"id":"t_demo00405","date":"2024-07-06","time":null,"note":"Nạp MoMo","lines":[{"account":"vcb","amount":-2000000},{"account":"momo","amount":2000000}]}
+{"id":"t_demo00406","date":"2024-07-06","time":null,"note":"Cafe sáng","lines":[{"account":"cash","amount":-25000},{"category":"transport/fares","amount":25000}]}
+{"id":"t_demo00416","date":"2024-07-06","time":null,"note":"Ăn trưa","lines":[{"account":"cash","amount":-59000},{"category":"food/cafe","amount":59000}]}
+{"id":"t_demo00401","date":"2024-07-08","time":null,"note":"Tiền điện","lines":[{"account":"vcb","amount":-843000},{"category":"home/electricity","amount":843000}],"who":null}
+{"id":"t_demo00408","date":"2024-07-08","time":null,"note":"Gửi xe","lines":[{"account":"cash","amount":-77000},{"category":"food/eating-out","amount":77000}]}
+{"id":"t_demo00414","date":"2024-07-08","time":null,"note":"Ăn trưa","lines":[{"account":"momo","amount":-70000},{"category":"food/cafe","amount":70000}]}
+{"id":"t_demo00402","date":"2024-07-09","time":null,"note":"Internet","lines":[{"account":"vcb","amount":-250000},{"category":"home/internet","amount":250000}]}
+{"id":"t_demo00409","date":"2024-07-09","time":null,"note":"Gửi xe","lines":[{"account":"momo","amount":-25000},{"category":"transport/fares","amount":25000}]}
+{"id":"t_demo00403","date":"2024-07-10","time":null,"note":"Gửi bố mẹ","lines":[{"account":"vcb","amount":-3000000},{"category":"family/parents","amount":3000000}],"who":"Bố mẹ"}
+{"id":"t_demo00407","date":"2024-07-14","time":null,"note":"food/cafe","lines":[{"account":"card-visa","amount":-60000},{"category":"food/cafe","amount":60000}]}
+{"id":"t_demo00417","date":"2024-07-14","time":null,"note":"Đổ xăng","lines":[{"account":"card-visa","amount":-14000},{"category":"transport/fares","amount":14000}]}
+{"id":"t_demo00418","date":"2024-07-15","time":null,"note":"transport/fares","lines":[{"account":"card-visa","amount":-49000},{"category":"transport/fares","amount":49000}]}
+{"id":"t_demo00420","date":"2024-07-15","time":null,"note":"Tên miền & hosting","lines":[{"account":"card-visa","amount":-521000},{"category":"work-tools","amount":521000}],"tags":["work"]}
+{"id":"t_demo01122","date":"2024-07-15","time":null,"note":"Tất toán sổ tiết kiệm","lines":[{"account":"dep-2024","amount":-50000000},{"account":"vcb","amount":50000000}]}
+{"id":"t_demo01123","date":"2024-07-15","time":null,"note":"Lãi sổ tiết kiệm","lines":[{"account":"vcb","amount":1196712},{"category":"interest","amount":-1196712}]}
+{"id":"t_demo00421","date":"2024-07-16","time":null,"note":"Mua CCQ VESAF","lines":[{"account":"vcb","amount":-1999959},{"account":"fund-vesaf","asset":"VESAF","qty":79.74,"amount":1999959}]}
+{"id":"t_demo00415","date":"2024-07-17","time":null,"note":"Đi chợ","lines":[{"account":"card-visa","amount":-261000},{"category":"food/groceries","amount":261000}]}
+{"id":"t_demo00411","date":"2024-07-18","time":null,"note":"food/eating-out","lines":[{"account":"card-visa","amount":-96000},{"category":"food/eating-out","amount":96000}]}
+{"id":"t_demo00412","date":"2024-07-20","time":null,"note":"Ăn trưa","lines":[{"account":"card-visa","amount":-77000},{"category":"food/cafe","amount":77000}]}
+{"id":"t_demo00410","date":"2024-07-24","time":null,"note":"Gửi xe","lines":[{"account":"card-visa","amount":-564000},{"category":"food/groceries","amount":564000}]}
+{"id":"t_demo00413","date":"2024-07-25","time":null,"note":"Đi chợ","lines":[{"account":"cash","amount":-68000},{"category":"food/cafe","amount":68000}]}
+{"id":"t_demo00419","date":"2024-07-26","time":null,"note":"food/eating-out","lines":[{"account":"momo","amount":-161000},{"category":"food/eating-out","amount":161000}]}

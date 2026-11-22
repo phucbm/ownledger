@@ -1,0 +1,3 @@
+{"id":"t1","date":"2026-01-01","lines":[{"account":"cash","amount":1000000},{"category":"_opening","amount":-1000000}]}
+{"id":"t2","date":"2026-01-05","lines":[{"account":"cash","amount":-500000},{"account":"pension","amount":500000}],"mood":"happy"}
+{"id":"t3","date":"2026-01-07","lines":[{"account":"card","amount":-120000},{"category":"food/cafe","amount":120000,"receipt":"r-1"}]}

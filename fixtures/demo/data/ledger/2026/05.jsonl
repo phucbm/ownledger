@@ -1,0 +1,28 @@
+{"id":"t_demo00983","date":"2026-05-01","time":null,"note":"Trả nợ vay sửa nhà","lines":[{"account":"vcb","amount":-4300000},{"account":"loan-home","amount":3333333},{"category":"bank-fees","amount":966667}],"plan":"p-home"}
+{"id":"t_demo00955","date":"2026-05-05","time":null,"note":"Thanh toán thẻ Visa","lines":[{"account":"vcb","amount":-2604000},{"account":"card-visa","amount":2604000}]}
+{"id":"t_demo00956","date":"2026-05-05","time":null,"note":"Lương tháng","lines":[{"account":"vcb","amount":39000000},{"category":"salary","amount":-39000000}]}
+{"id":"t_demo00961","date":"2026-05-06","time":null,"note":"Rút tiền mặt","lines":[{"account":"vcb","amount":-4000000},{"account":"cash","amount":4000000}]}
+{"id":"t_demo00962","date":"2026-05-06","time":null,"note":"Nạp MoMo","lines":[{"account":"vcb","amount":-2000000},{"account":"momo","amount":2000000}]}
+{"id":"t_demo00972","date":"2026-05-06","time":null,"note":"Gửi xe","lines":[{"account":"cash","amount":-79000},{"category":"food/cafe","amount":79000}]}
+{"id":"t_demo00963","date":"2026-05-07","time":null,"note":"Để dành đi Nhật","lines":[{"account":"vcb","amount":-2000000},{"account":"goal-trip","amount":2000000}]}
+{"id":"t_demo00958","date":"2026-05-08","time":null,"note":"Tiền điện","lines":[{"account":"vcb","amount":-1123000},{"category":"home/electricity","amount":1123000}],"who":null}
+{"id":"t_demo00965","date":"2026-05-08","time":null,"note":"Gửi xe","lines":[{"account":"card-visa","amount":-18000},{"category":"transport/fares","amount":18000}]}
+{"id":"t_demo00959","date":"2026-05-09","time":null,"note":"Internet","lines":[{"account":"vcb","amount":-250000},{"category":"home/internet","amount":250000}]}
+{"id":"t_demo00967","date":"2026-05-09","time":null,"note":"Cafe sáng","lines":[{"account":"card-visa","amount":-83000},{"category":"transport/fuel","amount":83000}]}
+{"id":"t_demo00971","date":"2026-05-09","time":null,"note":"Gửi xe","lines":[{"account":"card-visa","amount":-179000},{"category":"food/eating-out","amount":179000}]}
+{"id":"t_demo00960","date":"2026-05-10","time":null,"note":"Gửi bố mẹ","lines":[{"account":"vcb","amount":-3000000},{"category":"family/parents","amount":3000000}],"who":"Bố mẹ"}
+{"id":"t_demo00976","date":"2026-05-11","time":null,"note":"Ăn trưa","lines":[{"account":"card-visa","amount":-41000},{"category":"food/cafe","amount":41000}]}
+{"id":"t_demo00969","date":"2026-05-12","time":null,"note":"Cafe sáng","lines":[{"account":"cash","amount":-397000},{"category":"food/groceries","amount":397000}]}
+{"id":"t_demo00978","date":"2026-05-14","time":null,"note":"Mua Shopee trả sau","lines":[{"account":"spaylater","amount":-1221000},{"category":"shopping/clothes","amount":1221000}]}
+{"id":"t_demo00974","date":"2026-05-16","time":null,"note":"Đi chợ","lines":[{"account":"momo","amount":-499000},{"category":"food/groceries","amount":499000}]}
+{"id":"t_demo00981","date":"2026-05-16","time":null,"note":"Mua CCQ VESAF","lines":[{"account":"vcb","amount":-1999978},{"account":"fund-vesaf","asset":"VESAF","qty":78.73,"amount":1999978}]}
+{"id":"t_demo00982","date":"2026-05-16","time":null,"note":"Mua E1VFVN30","lines":[{"account":"vcb","amount":-1266850},{"account":"etf-e1","asset":"E1VFVN30","qty":50,"amount":1266850}]}
+{"id":"t_demo00977","date":"2026-05-17","time":null,"note":"Cafe sáng","lines":[{"account":"cash","amount":-45000},{"category":"transport/fares","amount":45000}]}
+{"id":"t_demo00957","date":"2026-05-18","time":null,"note":"Dự án làm thêm","lines":[{"account":"vcb","amount":7000000},{"category":"freelance","amount":-7000000}]}
+{"id":"t_demo00964","date":"2026-05-18","time":null,"note":"Cafe sáng","lines":[{"account":"cash","amount":-383000},{"category":"food/groceries","amount":383000}]}
+{"id":"t_demo00980","date":"2026-05-20","time":null,"note":"Trả góp điện thoại","lines":[{"account":"card-visa","amount":-2000000},{"category":"shopping/big-purchases","amount":2000000}],"plan":"p-phone"}
+{"id":"t_demo00966","date":"2026-05-24","time":null,"note":"Ăn trưa","lines":[{"account":"cash","amount":-60000},{"category":"food/cafe","amount":60000}]}
+{"id":"t_demo00968","date":"2026-05-24","time":null,"note":"Gửi xe","lines":[{"account":"momo","amount":-134000},{"category":"food/eating-out","amount":134000}]}
+{"id":"t_demo00970","date":"2026-05-25","time":null,"note":"food/cafe","lines":[{"account":"card-visa","amount":-55000},{"category":"food/cafe","amount":55000}]}
+{"id":"t_demo00973","date":"2026-05-28","time":null,"note":"Đổ xăng","lines":[{"account":"momo","amount":-71000},{"category":"food/cafe","amount":71000}]}
+{"id":"t_demo00975","date":"2026-05-30","time":null,"note":"food/cafe","lines":[{"account":"cash","amount":-72000},{"category":"food/cafe","amount":72000}]}

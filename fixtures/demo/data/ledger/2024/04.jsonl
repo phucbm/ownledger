@@ -1,0 +1,25 @@
+{"id":"t_demo00329","date":"2024-04-05","time":null,"note":"Thanh toán thẻ Visa","lines":[{"account":"vcb","amount":-1425000},{"account":"card-visa","amount":1425000}]}
+{"id":"t_demo00330","date":"2024-04-05","time":null,"note":"Lương tháng","lines":[{"account":"vcb","amount":33000000},{"category":"salary","amount":-33000000}]}
+{"id":"t_demo00334","date":"2024-04-06","time":null,"note":"Rút tiền mặt","lines":[{"account":"vcb","amount":-4000000},{"account":"cash","amount":4000000}]}
+{"id":"t_demo00335","date":"2024-04-06","time":null,"note":"Nạp MoMo","lines":[{"account":"vcb","amount":-2000000},{"account":"momo","amount":2000000}]}
+{"id":"t_demo00345","date":"2024-04-06","time":null,"note":"Cafe sáng","lines":[{"account":"card-visa","amount":-579000},{"category":"food/groceries","amount":579000}]}
+{"id":"t_demo00340","date":"2024-04-07","time":null,"note":"Đi chợ","lines":[{"account":"card-visa","amount":-43000},{"category":"transport/fares","amount":43000}]}
+{"id":"t_demo00331","date":"2024-04-08","time":null,"note":"Tiền điện","lines":[{"account":"vcb","amount":-685000},{"category":"home/electricity","amount":685000}],"who":null}
+{"id":"t_demo00332","date":"2024-04-09","time":null,"note":"Internet","lines":[{"account":"vcb","amount":-250000},{"category":"home/internet","amount":250000}]}
+{"id":"t_demo00344","date":"2024-04-09","time":null,"note":"Ăn trưa","lines":[{"account":"cash","amount":-503000},{"category":"food/groceries","amount":503000}]}
+{"id":"t_demo00333","date":"2024-04-10","time":null,"note":"Gửi bố mẹ","lines":[{"account":"vcb","amount":-3000000},{"category":"family/parents","amount":3000000}],"who":"Bố mẹ"}
+{"id":"t_demo00336","date":"2024-04-10","time":null,"note":"Đi chợ","lines":[{"account":"cash","amount":-67000},{"category":"transport/fuel","amount":67000}]}
+{"id":"t_demo01130","date":"2024-04-10","time":null,"note":"Phí bảo hiểm nhân thọ","lines":[{"account":"vcb","amount":-12000000},{"category":"health/insurance","amount":12000000}],"plan":"p-life"}
+{"id":"t_demo00338","date":"2024-04-12","time":null,"note":"Cafe sáng","lines":[{"account":"cash","amount":-289000},{"category":"food/groceries","amount":289000}]}
+{"id":"t_demo00351","date":"2024-04-14","time":null,"note":"Mua Shopee trả sau","lines":[{"account":"spaylater","amount":-1543000},{"category":"shopping/clothes","amount":1543000}]}
+{"id":"t_demo00343","date":"2024-04-15","time":null,"note":"Cafe sáng","lines":[{"account":"card-visa","amount":-50000},{"category":"food/cafe","amount":50000}]}
+{"id":"t_demo00347","date":"2024-04-15","time":null,"note":"Ăn trưa","lines":[{"account":"cash","amount":-247000},{"category":"food/eating-out","amount":247000}]}
+{"id":"t_demo00353","date":"2024-04-16","time":null,"note":"Mua CCQ VESAF","lines":[{"account":"vcb","amount":-1999902},{"account":"fund-vesaf","asset":"VESAF","qty":83.08,"amount":1999902}]}
+{"id":"t_demo00346","date":"2024-04-18","time":null,"note":"Gửi xe","lines":[{"account":"cash","amount":-319000},{"category":"food/groceries","amount":319000}]}
+{"id":"t_demo00349","date":"2024-04-20","time":null,"note":"food/cafe","lines":[{"account":"card-visa","amount":-69000},{"category":"food/cafe","amount":69000}]}
+{"id":"t_demo00337","date":"2024-04-21","time":null,"note":"Ăn trưa","lines":[{"account":"cash","amount":-89000},{"category":"transport/fuel","amount":89000}]}
+{"id":"t_demo00342","date":"2024-04-22","time":null,"note":"food/eating-out","lines":[{"account":"card-visa","amount":-201000},{"category":"food/eating-out","amount":201000}]}
+{"id":"t_demo00350","date":"2024-04-22","time":null,"note":"Quần áo","lines":[{"account":"momo","amount":-306000},{"category":"shopping/clothes","amount":306000}]}
+{"id":"t_demo00348","date":"2024-04-23","time":null,"note":"transport/fuel","lines":[{"account":"momo","amount":-65000},{"category":"transport/fuel","amount":65000}]}
+{"id":"t_demo00341","date":"2024-04-25","time":null,"note":"transport/fares","lines":[{"account":"momo","amount":-35000},{"category":"transport/fares","amount":35000}]}
+{"id":"t_demo00339","date":"2024-04-26","time":null,"note":"Cafe sáng","lines":[{"account":"momo","amount":-21000},{"category":"transport/fares","amount":21000}]}

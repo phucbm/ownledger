@@ -1,0 +1,87 @@
+income:
+  - id: salary
+    name: Salary
+  - id: freelance
+    name: Freelance
+  - id: interest
+    name: Interest & dividends
+  - id: cashback
+    name: Cashback & promos
+  - id: gifts-received
+    name: Gifts received
+  - id: other-income
+    name: Other income
+expense:
+  - id: food
+    name: Food
+    children:
+      - id: eating-out
+        name: Eating out
+      - id: cafe
+        name: Cafe
+      - id: groceries
+        name: Groceries
+  - id: transport
+    name: Transport
+    children:
+      - id: fuel
+        name: Fuel
+      - id: fares
+        name: Fares & parking
+      - id: vehicle
+        name: Vehicle repairs
+  - id: home
+    name: Home
+    children:
+      - id: electricity
+        name: Electricity & water
+      - id: internet
+        name: Internet
+      - id: repairs
+        name: Repairs
+      - id: household
+        name: Household items
+      - id: plants
+        name: Plants
+  - id: family
+    name: Family
+    children:
+      - id: parents
+        name: Parents
+      - id: gifts-weddings
+        name: Gifts & weddings
+  - id: health
+    name: Health & sport
+    children:
+      - id: sport
+        name: Sport
+      - id: medical
+        name: Medical
+      - id: personal-care
+        name: Personal care
+      - id: insurance
+        name: Insurance premiums
+  - id: shopping
+    name: Shopping
+    children:
+      - id: clothes
+        name: Clothes
+      - id: big-purchases
+        name: Big purchases
+  - id: fun
+    name: Fun & travel
+    children:
+      - id: entertainment
+        name: Entertainment
+      - id: trips
+        name: Trips
+  - id: learning
+    name: Learning
+  - id: work-tools
+    name: Work tools
+  - id: subscriptions
+    name: Phone & subscriptions
+  - id: bank-fees
+    name: Bank fees & interest paid
+  - id: other
+    name: Other / unknown

@@ -1,0 +1,119 @@
+- id: cash
+  name: Ví tiền mặt
+  type: cash
+  opened: 2023-01-01
+- id: vcb
+  name: Vietcombank
+  type: bank
+  opened: 2023-01-01
+  details:
+    bank: VCB
+    number_last4: "0001"
+- id: momo
+  name: MoMo
+  type: ewallet
+  opened: 2023-01-01
+  details:
+    provider: MoMo
+- id: card-visa
+  name: Thẻ Visa
+  type: credit_card
+  opened: 2023-03-01
+  details:
+    statement_day: 20
+    due_day: 5
+    limit: 50000000
+    bank: Demo Bank
+- id: spaylater
+  name: SPayLater
+  type: bnpl
+  opened: 2024-02-01
+  details:
+    provider: Shopee
+    limit: 10000000
+    due_day: 10
+- id: dep-2024
+  name: Sổ tiết kiệm 2024
+  type: deposit
+  opened: 2024-01-15
+  closed: 2024-07-15
+  details:
+    bank: VCB
+    principal: 50000000
+    rate: 4.8
+    term_months: 6
+    start: 2024-01-15
+    rollover: none
+- id: dep-6m
+  name: Sổ tiết kiệm 6 tháng
+  type: deposit
+  opened: 2026-06-01
+  details:
+    bank: VCB
+    principal: 100000000
+    rate: 5.2
+    term_months: 6
+    start: 2026-06-01
+    rollover: principal
+- id: goal-trip
+  name: Quỹ du lịch Nhật
+  type: savings_goal
+  opened: 2025-01-01
+  details:
+    target: 60000000
+    by: 2027-03-01
+- id: gold
+  name: Vàng nhẫn
+  type: gold
+  asset: GOLD_CHI
+  opened: 2023-06-01
+- id: fund-vesaf
+  name: Quỹ VESAF
+  type: fund
+  asset: VESAF
+  opened: 2024-01-01
+  details:
+    broker: Demo Fund Co
+- id: stock-fpt
+  name: Cổ phiếu FPT
+  type: stock
+  asset: FPT
+  opened: 2024-05-01
+  details:
+    broker: Demo Securities
+- id: etf-e1
+  name: ETF E1VFVN30
+  type: etf
+  asset: E1VFVN30
+  opened: 2025-01-01
+  details:
+    broker: Demo Securities
+- id: btc
+  name: Bitcoin
+  type: crypto
+  asset: BTC
+  opened: 2025-06-01
+- id: ins-life
+  name: Bảo hiểm nhân thọ
+  type: insurance
+  opened: 2023-04-01
+  details:
+    insurer: Demo Life
+    cash_value: 12000000
+- id: loan-an
+  name: Cho An mượn
+  type: loan_given
+  opened: 2024-03-01
+  details:
+    borrower: An
+- id: loan-home
+  name: Vay sửa nhà
+  type: loan_taken
+  opened: 2025-03-01
+  details:
+    lender: Demo Bank
+    rate: 9.5
+- id: misc
+  name: Khác
+  type: other
+  opened: 2023-01-01

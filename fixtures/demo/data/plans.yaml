@@ -1,0 +1,25 @@
+- id: p-phone
+  kind: instalment
+  account: card-visa
+  name: Trả góp điện thoại
+  principal: 24000000
+  count: 12
+  every: month
+  start: 2025-09-20
+  fee: 0
+- id: p-life
+  kind: insurance_premium
+  account: vcb
+  name: Phí bảo hiểm nhân thọ
+  amount: 12000000
+  every: year
+  start: 2023-04-10
+- id: p-home
+  kind: loan_taken
+  account: loan-home
+  name: Trả nợ vay sửa nhà
+  principal: 120000000
+  count: 36
+  every: month
+  start: 2025-04-01
+  rate: 9.5

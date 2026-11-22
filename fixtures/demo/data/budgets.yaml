@@ -1,0 +1,6 @@
+- category: food
+  amount: 4000000
+  every: month
+- category: fun
+  amount: 15000000
+  every: year
