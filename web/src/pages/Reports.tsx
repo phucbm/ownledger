@@ -164,7 +164,7 @@ export default function Reports() {
       {!valid ? (
         <p className="text-sm text-muted-foreground">{t("reports.badRange")}</p>
       ) : (
-        <>
+        <div className="grid items-start gap-6 2xl:grid-cols-2">
           <Panel title={t("reports.compare")} action={<PinToHome query={usualQuery} title={t("reports.compare")} />}>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
               <ToggleGroup type="single" variant="outline" size="sm" value={kind} onValueChange={(v) => v && setKind(v as Kind)} aria-label={t("reports.kind")}>
@@ -282,7 +282,7 @@ export default function Reports() {
               </>
             )}
           </Panel>
-        </>
+        </div>
       )}
     </div>
   );

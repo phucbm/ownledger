@@ -14,7 +14,7 @@ export function Shell({ me, children }: { me: Me; children: ReactNode }) {
           <DesktopSidebar login={me.login} features={me.features} />
         </div>
         <main className="min-w-0 flex-1 pb-20 md:pb-0">
-          <div className="mx-auto w-full max-w-[1280px] p-4 md:p-6">
+          <div className="mx-auto w-full max-w-[1680px] p-4 md:p-6">
             <PinProvider>{children}</PinProvider>
           </div>
         </main>

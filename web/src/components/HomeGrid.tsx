@@ -1,9 +1,10 @@
 import ReactGridLayout, { useContainerWidth, verticalCompactor, type Layout } from "react-grid-layout";
 import "react-grid-layout/css/styles.css";
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { useMediaQuery } from "@/hooks/use-media-query";
 import { widgetRegistry } from "@/components/widgets/registry";
 import { cn } from "@/lib/utils";
+import { flow } from "@/lib/dashboard";
 import type { Widget } from "@/lib/types";
 
 export const GRID_COLS = 12;
@@ -11,6 +12,8 @@ export const ROW_HEIGHT = 80;
 export const GRID_GAP = 16;
 /** Below this width the grid is one column in widget order (and edit mode there is reorder, add, remove only). */
 export const STACK_BELOW = 640;
+/** From this width (and when not editing) 6-wide widgets are shown 4 wide, three to a row. Display only: never saved. */
+export const THREE_UP_FROM = 1536;
 /** The class of the element that starts a drag in edit mode (the grip in each widget's header). */
 export const DRAG_HANDLE = "widget-drag-handle";
 
@@ -24,7 +27,10 @@ const byPosition = (a: Widget, b: Widget) => a.y - b.y || a.x - b.x;
  */
 export function HomeGrid({ widgets, renderWidget, editing = false, onLayoutChange }: { widgets: Widget[]; renderWidget: (w: Widget) => ReactNode; editing?: boolean; onLayoutChange?: (layout: Layout) => void }) {
   const stacked = useMediaQuery(`(max-width: ${STACK_BELOW - 1}px)`);
+  const wide = useMediaQuery(`(min-width: ${THREE_UP_FROM}px)`);
   const { width, containerRef, mounted } = useContainerWidth();
+  const threeUp = wide && !editing;
+  const shown = useMemo(() => (threeUp ? flow([...widgets].sort(byPosition).map((w) => (w.w === 6 ? { ...w, w: 4 } : w))) : widgets), [threeUp, widgets]);
 
   if (stacked) {
     return (
@@ -38,7 +44,7 @@ export function HomeGrid({ widgets, renderWidget, editing = false, onLayoutChang
     );
   }
 
-  const layout = widgets.map((w) => {
+  const layout = shown.map((w) => {
     const min = widgetRegistry[w.type]?.min;
     return { i: w.id, x: w.x, y: w.y, w: w.w, h: w.h, ...(min ? { minW: Math.min(min.w, w.w), minH: Math.min(min.h, w.h) } : {}) };
   });
@@ -52,9 +58,9 @@ export function HomeGrid({ widgets, renderWidget, editing = false, onLayoutChang
           dragConfig={{ enabled: editing, handle: `.${DRAG_HANDLE}` }}
           resizeConfig={{ enabled: editing }}
           compactor={verticalCompactor}
-          onLayoutChange={onLayoutChange}
+          onLayoutChange={editing ? onLayoutChange : undefined}
         >
-          {widgets.map((w) => (
+          {shown.map((w) => (
             <div key={w.id} className={cn("flex flex-col *:flex-1", editing && "rounded-xl outline-2 outline-offset-2 outline-dashed outline-border")}>
               {renderWidget(w)}
             </div>

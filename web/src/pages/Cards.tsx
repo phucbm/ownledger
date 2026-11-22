@@ -148,7 +148,7 @@ export default function Cards() {
             {credit.length === 0 ? (
               <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">{t("cards.emptyCredit")}</p>
             ) : (
-              <ul className="grid gap-3 lg:grid-cols-2">{credit.map((c) => <CardRow key={c.account} c={c} />)}</ul>
+              <ul className="grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">{credit.map((c) => <CardRow key={c.account} c={c} />)}</ul>
             )}
           </section>
 

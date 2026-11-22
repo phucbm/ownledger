@@ -3,7 +3,9 @@ import { useMemo, useState, type ReactNode } from "react";
 import { AskAI } from "@/components/AskAI";
 import { Money } from "@/components/Money";
 import { DaysLeft, UsedBar } from "@/components/cards/bits";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useI18n } from "@/i18n";
 import { cardHref } from "@/lib/cards";
 import { daysBetween, dayMonth } from "@/lib/dates";
@@ -22,12 +24,13 @@ interface Group {
   value: number;
   items: AccountRow[];
   pool?: boolean;
+  color?: string;
 }
 
 const abs = (a: AccountRow) => Math.abs(a.value);
 
 function Badge({ children, tone }: { children: ReactNode; tone?: "warn" }) {
-  return <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", tone === "warn" ? "bg-amber-100 text-amber-900" : "bg-secondary text-secondary-foreground")}>{children}</span>;
+  return <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", tone === "warn" ? "bg-warning/10 text-warning" : "bg-secondary text-secondary-foreground")}>{children}</span>;
 }
 
 /** One account: the whole row opens its transactions (with the running balance); the extras depend on its type. */
@@ -41,7 +44,7 @@ function AccountLine({ a, holdings, card, deposit, nested }: { a: AccountRow; ho
           {a.closed && <Badge>{t("accounts.closedOn", { date: formatDate(a.closed, lang) })}</Badge>}
           {holdings && !a.priced && <Badge tone="warn">{t("accounts.noPrice")}</Badge>}
         </span>
-        <Money amount={a.value} mode="short" tone={a.value < 0 ? "out" : "none"} className="shrink-0 text-sm font-medium" />
+        <Money amount={a.value} mode="short" className="shrink-0 text-sm font-medium" />
       </div>
       {holdings && (
         <p className="text-xs text-muted-foreground tabular-nums">
@@ -101,10 +104,7 @@ export default function Accounts() {
   const today = me?.today ?? new Date().toISOString().slice(0, 10);
   const pool = me?.pool;
   const poolName = pool?.name ?? t("pool.name");
-  const [poolOpen, setPoolOpen] = useState(false);
   const [poolInactive, setPoolInactive] = useState(false);
-  const [inactiveOpen, setInactiveOpen] = useState(false);
-  const [closedOpen, setClosedOpen] = useState(false);
 
   const typeLabel = (ty: string) => meta?.types[ty]?.[lang] ?? ty;
   const isHoldings = (ty: string) => Boolean(meta?.types[ty]?.holdings);
@@ -113,18 +113,15 @@ export default function Accounts() {
 
   const model = useMemo(() => {
     const all = accounts ?? [];
-    const liability = (a: AccountRow) => (Boolean(meta?.types[a.type]?.liability) || a.value < 0) && a.value < 0;
+    const isLiabilityType = (a: AccountRow) => Boolean(meta?.types[a.type]?.liability);
+    const liability = (a: AccountRow) => (isLiabilityType(a) || a.value < 0) && a.value < 0;
     let assets = 0;
     let liabilities = 0;
-    const byType = new Map<string, number>();
     let unpriced = 0;
     for (const a of all) {
       if (a.value === 0 && !a.qty) continue;
       if (liability(a)) liabilities += a.value;
-      else {
-        assets += a.value;
-        byType.set(a.type, (byType.get(a.type) ?? 0) + a.value);
-      }
+      else assets += a.value;
       if (!a.priced) unpriced++;
     }
     const inactive = (a: AccountRow) => a.value === 0 && !a.qty && (a.lastActivity === null || daysBetween(a.lastActivity, today) > INACTIVE_DAYS);
@@ -134,8 +131,12 @@ export default function Accounts() {
     const rest = open.filter((a) => !pooled.includes(a));
     const inactiveRest = rest.filter(inactive);
     const live = rest.filter((a) => !inactive(a));
+    // Debt tab: what you owe (credit cards, loans) and any account below zero. Soonest card due first, then biggest.
+    const debt = live.filter((a) => isLiabilityType(a) || a.value < 0);
+    const due = (a: AccountRow) => cardOf.get(a.id)?.daysToDue ?? Number.POSITIVE_INFINITY;
+    debt.sort((x, y) => due(x) - due(y) || x.value - y.value);
     const groups = new Map<string, Group>();
-    for (const a of live) {
+    for (const a of live.filter((x) => !debt.includes(x))) {
       const g = groups.get(a.type) ?? { id: a.type, label: typeLabel(a.type), value: 0, items: [] };
       g.items.push(a);
       g.value += a.value;
@@ -147,11 +148,11 @@ export default function Accounts() {
     const poolIdle = pooled.filter(inactive);
     if (pooled.length) list.push({ id: "pool", label: poolName, value: pooled.reduce((s, a) => s + a.value, 0), items: poolActive, pool: true });
     list.sort((x, y) => y.value - x.value);
-    const segments = [...byType].filter(([, v]) => v > 0).sort((x, y) => y[1] - x[1]);
-    const shown = segments.slice(0, SEGMENT_COLORS.length);
-    const rest2 = segments.slice(SEGMENT_COLORS.length).reduce((s, [, v]) => s + v, 0);
-    return { assets, liabilities, net: assets + liabilities, groups: list, poolIdle, poolCount: pooled.length, inactiveRest: inactiveRest.sort((x, y) => x.name.localeCompare(y.name)), closed: closed.sort((x, y) => (y.closed ?? "").localeCompare(x.closed ?? "")), segments: shown, other: rest2, unpriced, any: all.length > 0 };
-  }, [accounts, meta, pool?.on, poolName, today, lang]);
+    // The bar and the group dots share colours: the five biggest groups get a hue each, the rest are grey ("Other").
+    list.forEach((g, i) => (g.color = g.value > 0 && i < SEGMENT_COLORS.length ? SEGMENT_COLORS[i] : "var(--chart-muted)"));
+    const assetCount = list.reduce((n, g) => n + (g.pool ? pooled.length : g.items.length), 0);
+    return { assets, liabilities, net: assets + liabilities, groups: list, debt, poolIdle, poolCount: pooled.length, assetCount, inactiveRest: inactiveRest.sort((x, y) => x.name.localeCompare(y.name)), closed: closed.sort((x, y) => (y.closed ?? "").localeCompare(x.closed ?? "")), unpriced, any: all.length > 0 };
+  }, [accounts, meta, pool?.on, poolName, today, lang, cardOf]);
 
   if (error) return <p className="text-sm text-muted-foreground">{t("common.error", { message: error.message })}</p>;
   if (isLoading || !accounts || !meta) {
@@ -174,92 +175,106 @@ export default function Accounts() {
   }
 
   const line = (a: AccountRow, nested?: boolean) => <AccountLine key={a.id} a={a} nested={nested} holdings={isHoldings(a.type)} card={cardOf.get(a.id)} deposit={depositOf.get(a.id)} />;
-  const segs = [...model.segments.map(([ty, v], i) => ({ key: ty, label: typeLabel(ty), value: v, color: SEGMENT_COLORS[i]! })), ...(model.other > 0 ? [{ key: "other", label: t("accounts.other"), value: model.other, color: "var(--chart-muted)" }] : [])];
+  const positive = model.groups.filter((g) => g.value > 0);
+  const barTotal = positive.reduce((s, g) => s + g.value, 0);
+  const share = (v: number) => (barTotal > 0 && v > 0 ? `${formatNumber((v / barTotal) * 100, lang)}%` : "");
+  const idleCount = model.inactiveRest.length + model.closed.length;
 
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-1">
         <h1 className="text-2xl font-semibold tracking-tight">{t("accounts.title")}</h1>
         <p className="text-sm text-muted-foreground">{t("accounts.netWorth")}</p>
-        <Money amount={model.net} className="text-3xl font-semibold tracking-tight" />
+        <Money amount={model.net} className="text-3xl font-semibold tracking-tight md:text-4xl" />
         <p className="text-sm text-muted-foreground">
           {t("accounts.assets")} <Money amount={model.assets} mode="short" className="font-medium text-foreground" />
           {" · "}
-          {t("accounts.liabilities")} <Money amount={model.liabilities} mode="short" tone={model.liabilities < 0 ? "out" : "none"} className="font-medium" />
+          {t("accounts.liabilities")} <Money amount={model.liabilities} mode="short" className="font-medium text-foreground" />
         </p>
         {model.unpriced > 0 && <p className="text-xs text-muted-foreground">{t("nw.unpriced", { n: model.unpriced })}</p>}
       </header>
 
-      {segs.length > 0 && (
-        <section aria-label={t("accounts.byType")} className="flex flex-col gap-3">
-          <div className="flex h-3 w-full gap-0.5 overflow-hidden rounded-full" role="img" aria-label={t("accounts.byType")}>
-            {segs.map((s) => (
-              <span key={s.key} className="h-3 first:rounded-l-full last:rounded-r-full" style={{ width: `${(s.value / model.assets) * 100}%`, background: s.color }} />
-            ))}
-          </div>
-          <ul className="grid gap-x-6 gap-y-1 sm:grid-cols-2">
-            {segs.map((s) => (
-              <li key={s.key} className="flex items-center gap-2 text-sm">
-                <span aria-hidden className="size-2.5 shrink-0 rounded-sm" style={{ background: s.color }} />
-                <span className="min-w-0 flex-1 truncate">{s.label}</span>
-                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{formatNumber((s.value / model.assets) * 100, lang)}%</span>
-                <Money amount={s.value} mode="short" className="w-16 shrink-0 text-right text-sm" />
-              </li>
-            ))}
-          </ul>
-          {model.liabilities < 0 && (
-            <p className="flex items-center justify-between gap-2 border-t pt-2 text-sm">
-              <span>{t("accounts.liabilities")}</span>
-              <Money amount={model.liabilities} tone="out" className="font-medium" />
-            </p>
-          )}
-        </section>
+      {positive.length > 0 && (
+        <div className="flex h-2.5 w-full gap-0.5 overflow-hidden rounded-full" role="img" aria-label={`${t("accounts.byType")}: ${positive.map((g) => `${g.label} ${share(g.value)}`).join(", ")}`}>
+          {positive.map((g) => (
+            <span key={g.id} className="h-full first:rounded-l-full last:rounded-r-full" style={{ width: `${(g.value / barTotal) * 100}%`, background: g.color }} title={`${g.label} ${share(g.value)}`} />
+          ))}
+        </div>
       )}
 
-      {model.groups.map((g) => (
-        <section key={g.id} aria-label={g.label} className="flex flex-col">
-          <h2 className="flex items-baseline justify-between gap-2 border-b px-2 pb-1.5 text-sm font-semibold">
-            <span>{g.label}{!g.pool && <span className="ml-1.5 font-normal text-muted-foreground">({g.items.length})</span>}</span>
-            <Money amount={g.value} mode="short" tone={g.value < 0 ? "out" : "none"} />
-          </h2>
-          {g.pool ? (
-            <div className="flex flex-col">
-              <div className="relative flex min-h-11 items-center justify-between gap-2 rounded-md px-2 hover:bg-muted/40 focus-within:ring-3 focus-within:ring-ring/50">
-                <a href={drillHref({ account: "pool" })} className="truncate rounded-md text-sm font-medium outline-none after:absolute after:inset-0 focus-visible:underline">{poolName}</a>
-                <span className="flex shrink-0 items-center gap-1">
-                  <span className="text-xs text-muted-foreground">{t("accounts.inPool", { n: model.poolCount })}</span>
-                  <button type="button" aria-expanded={poolOpen} aria-label={t("accounts.expand", { name: poolName })} onClick={() => setPoolOpen((v) => !v)} className="relative z-10 flex size-11 items-center justify-center rounded-md outline-none hover:bg-muted focus-visible:ring-3 focus-visible:ring-ring/50">
-                    {poolOpen ? <ChevronDown className="size-4" aria-hidden /> : <ChevronRight className="size-4" aria-hidden />}
-                  </button>
-                </span>
-              </div>
-              {poolOpen && (
-                <>
-                  <ul className="flex flex-col">{g.items.map((a) => line(a, true))}</ul>
-                  {model.poolIdle.length > 0 && (
-                    <Disclosure nested open={poolInactive} onToggle={() => setPoolInactive((v) => !v)} label={t("accounts.inactive")} count={model.poolIdle.length}>
+      <Tabs defaultValue="assets" className="gap-4">
+        <TabsList className="h-10! w-full sm:w-fit">
+          <TabsTrigger value="assets" className="px-3">{t("accounts.assets")}<Count n={model.assetCount} /></TabsTrigger>
+          {model.debt.length > 0 && <TabsTrigger value="debt" className="px-3">{t("accounts.liabilities")}<Count n={model.debt.length} /></TabsTrigger>}
+          {idleCount > 0 && <TabsTrigger value="idle" className="px-3">{t("accounts.tabIdle")}<Count n={idleCount} /></TabsTrigger>}
+        </TabsList>
+
+        <TabsContent value="assets">
+          <div className="grid items-start gap-3 md:grid-cols-2">
+            {model.groups.map((g) => (
+              <Collapsible key={g.id} className="group/acc overflow-hidden rounded-xl bg-card ring-1 ring-foreground/[0.07] shadow-[0_1px_2px_oklch(0_0_0/0.04)]">
+                <CollapsibleTrigger className="flex min-h-14 w-full items-center gap-3 px-4 text-left outline-none hover:bg-muted/40 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset">
+                  <span aria-hidden className="size-2.5 shrink-0 rounded-full" style={{ background: g.color }} />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    {g.label}
+                    <span className="ml-1.5 font-normal text-muted-foreground tabular-nums">{g.pool ? model.poolCount : g.items.length}</span>
+                  </span>
+                  <Money amount={g.value} mode="short" className="shrink-0 text-sm font-semibold" />
+                  <span className="w-9 shrink-0 text-right text-xs text-muted-foreground tabular-nums">{share(g.value)}</span>
+                  <ChevronDown className="size-4 shrink-0 text-muted-foreground transition-transform group-data-[state=open]/acc:rotate-180 motion-reduce:transition-none" aria-hidden />
+                </CollapsibleTrigger>
+                <CollapsibleContent className="border-t px-2 py-1">
+                  {g.pool && (
+                    <a href={drillHref({ account: "pool" })} className="flex min-h-11 items-center justify-between gap-2 rounded-md px-2 text-sm text-muted-foreground outline-none hover:bg-muted/40 hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50">
+                      {t("accounts.poolTx", { name: poolName })}
+                      <ChevronRight className="size-4" aria-hidden />
+                    </a>
+                  )}
+                  <ul className="flex flex-col">{g.items.map((a) => line(a))}</ul>
+                  {g.pool && model.poolIdle.length > 0 && (
+                    <Disclosure open={poolInactive} onToggle={() => setPoolInactive((v) => !v)} label={t("accounts.inactive")} count={model.poolIdle.length}>
                       <ul className="flex flex-col">{model.poolIdle.map((a) => line(a, true))}</ul>
                     </Disclosure>
                   )}
-                </>
-              )}
-            </div>
-          ) : (
-            <ul className="flex flex-col">{g.items.map((a) => line(a))}</ul>
-          )}
-        </section>
-      ))}
+                </CollapsibleContent>
+              </Collapsible>
+            ))}
+          </div>
+        </TabsContent>
 
-      {model.inactiveRest.length > 0 && (
-        <Disclosure open={inactiveOpen} onToggle={() => setInactiveOpen((v) => !v)} label={t("accounts.inactive")} count={model.inactiveRest.length}>
-          <ul className="flex flex-col">{model.inactiveRest.map((a) => line(a))}</ul>
-        </Disclosure>
-      )}
-      {model.closed.length > 0 && (
-        <Disclosure open={closedOpen} onToggle={() => setClosedOpen((v) => !v)} label={t("accounts.closed")} count={model.closed.length}>
-          <ul className="flex flex-col">{model.closed.map((a) => line(a))}</ul>
-        </Disclosure>
-      )}
+        {model.debt.length > 0 && (
+          <TabsContent value="debt">
+            <ul className="grid items-start gap-3 md:grid-cols-2">
+              {model.debt.map((a) => (
+                <li key={a.id} className="list-none rounded-xl bg-card px-2 py-1 ring-1 ring-foreground/[0.07] shadow-[0_1px_2px_oklch(0_0_0/0.04)]">
+                  <ul>{line(a)}</ul>
+                </li>
+              ))}
+            </ul>
+          </TabsContent>
+        )}
+
+        {idleCount > 0 && (
+          <TabsContent value="idle" className="flex flex-col gap-5">
+            {model.inactiveRest.length > 0 && (
+              <section className="flex flex-col gap-1">
+                <h2 className="px-2 text-sm font-medium text-muted-foreground">{t("accounts.inactive")} <span className="tabular-nums">{model.inactiveRest.length}</span></h2>
+                <ul className="grid gap-x-6 rounded-xl bg-card px-2 py-1 ring-1 ring-foreground/[0.07] md:grid-cols-2">{model.inactiveRest.map((a) => line(a))}</ul>
+              </section>
+            )}
+            {model.closed.length > 0 && (
+              <section className="flex flex-col gap-1">
+                <h2 className="px-2 text-sm font-medium text-muted-foreground">{t("accounts.closed")} <span className="tabular-nums">{model.closed.length}</span></h2>
+                <ul className="grid gap-x-6 rounded-xl bg-card px-2 py-1 ring-1 ring-foreground/[0.07] md:grid-cols-2">{model.closed.map((a) => line(a))}</ul>
+              </section>
+            )}
+          </TabsContent>
+        )}
+      </Tabs>
     </div>
   );
+}
+
+function Count({ n }: { n: number }) {
+  return <span className="rounded-full bg-muted px-1.5 text-xs font-normal text-muted-foreground tabular-nums group-data-active:bg-secondary">{n}</span>;
 }

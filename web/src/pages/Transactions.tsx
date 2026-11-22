@@ -2,7 +2,7 @@ import { Search, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearch } from "wouter";
 import { Money } from "@/components/Money";
-import { TxPanel } from "@/components/TxPanel";
+import { TxDock, TxPanel } from "@/components/TxPanel";
 import { TxRow } from "@/components/TxRow";
 import { categoryGroups } from "@/components/cards/CategoryPicker";
 import { useAccountGroups } from "@/components/transactions/useAccountGroups";
@@ -10,6 +10,7 @@ import { Combobox, type ComboGroup } from "@/components/transactions/Combobox";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useI18n } from "@/i18n";
 import { addDaysIso, shiftMonth } from "@/lib/dates";
 import { monthRange } from "@/lib/drill";
@@ -115,6 +116,7 @@ export default function Transactions() {
     }
   }, [url.tx, items]);
   const open: Tx | null = items.find((i) => i.id === openId) ?? null;
+  const wide = useMediaQuery("(min-width: 1280px)");
 
   // ---- period chips
   const periodId: PeriodId = useMemo(() => {
@@ -273,6 +275,7 @@ export default function Transactions() {
           )}
         </div>
       ) : (
+        <div className={cn(wide && open && "grid grid-cols-[minmax(0,1fr)_380px] items-start gap-6")}>
         <div className={cn("flex flex-col", isFetching && !isFetchingNextPage && "opacity-70")}>
           {single && <p className="px-2 pb-1 text-right text-xs text-muted-foreground">{t("tx.balanceCol")}</p>}
           {groups.map((g) => (
@@ -296,9 +299,11 @@ export default function Transactions() {
             </Button>
           )}
         </div>
+        {wide && open && <TxDock tx={open} names={names} account={single} onClose={() => setOpenId(null)} />}
+        </div>
       )}
 
-      <TxPanel tx={open} names={names} account={single} onClose={() => setOpenId(null)} />
+      {!wide && <TxPanel tx={open} names={names} account={single} onClose={() => setOpenId(null)} />}
     </div>
   );
 }
