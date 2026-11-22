@@ -5,6 +5,7 @@ import { createServer } from "node:http";
 import { dirname, join, resolve } from "node:path";
 import { readDataDir } from "../node/files.js";
 import { pkgPath } from "../node/scaffold.js";
+import { openwalletFlag } from "./deploy.js";
 
 function opt(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
@@ -74,6 +75,7 @@ export async function cmdDev(args: string[]): Promise<number> {
   const port = Number(opt(args, "--port") ?? 8787);
   const dataPort = port + 3;
   const login = opt(args, "--login") ?? "dev";
+  const ow = openwalletFlag(args);
   startDataServer(root, dataPort);
   const cfgDir = join(root, ".wrangler");
   mkdirSync(cfgDir, { recursive: true });
@@ -100,13 +102,14 @@ export async function cmdDev(args: string[]): Promise<number> {
           GITHUB_CLIENT_ID: "dev",
           GITHUB_CLIENT_SECRET: "dev",
           COOKIE_SECRET: "dev-only-not-secret",
+          ...(ow ? { OPENWALLET_URL: ow } : {}),
         },
       },
       null,
       2,
     ),
   );
-  console.log(`ownledger dev: data ${root}\n  MCP        http://localhost:${port}/mcp   (sign-in skipped: ${login})\n  Dashboard  http://localhost:${port}/\n  Writes commit to the local folder${existsSync(join(root, ".git")) ? " (git)" : ""}.\n`);
+  console.log(`ownledger dev: data ${root}\n  MCP        http://localhost:${port}/mcp   (sign-in skipped: ${login})\n  Dashboard  http://localhost:${port}/\n  Writes commit to the local folder${existsSync(join(root, ".git")) ? " (git)" : ""}.\n${ow ? `  OpenWallet ${ow} (best_card on)\n` : ""}`);
   const child = spawn("npx", ["wrangler", "dev", "-c", cfg, "--port", String(port), "--persist-to", join(cfgDir, "state")], { cwd: root, stdio: "inherit" });
   return new Promise((r) => child.on("exit", (code) => r(code ?? 0)));
 }

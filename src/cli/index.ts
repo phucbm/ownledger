@@ -17,7 +17,8 @@ Usage: ownledger <command> [options]
   check [dir]          Check the data repo (default: current folder)
   import <file>        Import an export (profile first; preview; --yes writes, checks and commits)
   deploy               Deploy your Worker to your Cloudflare (GitHub App, secrets, KV); prints the connector URL
-  dev [dir]            Run your Worker locally against the local data/ (fake sign-in)
+                       --openwallet[=<url>] turns on the OpenWallet card catalog (best_card), --no-openwallet off
+  dev [dir]            Run your Worker locally against the local data/ (fake sign-in); --openwallet[=<url>] as above
   --version            Print the version
 `;
 
