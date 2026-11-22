@@ -196,7 +196,7 @@ export default function Transactions() {
           <p className="text-sm text-muted-foreground" aria-live="polite">
             <span>{t("tx.in")} <Money amount={totals.income} tone="in" mode="short" className="font-medium" /></span>
             {" · "}
-            <span>{t("tx.out")} <Money amount={totals.expense} tone="out" mode="short" className="font-medium" /></span>
+            <span>{t("tx.out")} <Money amount={totals.expense} mode="short" className="font-medium text-foreground" /></span>
             {" · "}
             <span>{t("tx.net")} <Money amount={totals.net} tone="auto" mode="short" className="font-medium" /></span>
             {" · "}
@@ -279,7 +279,7 @@ export default function Transactions() {
             <section key={g.date} aria-label={dayLabel(g.date)}>
               <h2 className="sticky top-0 z-10 flex items-baseline justify-between gap-2 border-b bg-background/95 px-2 py-2 text-sm font-medium backdrop-blur">
                 <span>{dayLabel(g.date)}</span>
-                <Money amount={g.net} mode="short" tone="auto" className="text-sm" />
+                <Money amount={g.net} mode="short" tone={g.net > 0 ? "in" : "none"} plus className="text-sm" />
               </h2>
               <ul>
                 {g.items.map((tx) => (
