@@ -4,13 +4,22 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "target": "ES2022",
-    "lib": ["ES2022"],
-    "types": ["node"],
+    "lib": [
+      "ES2022"
+    ],
+    "types": [
+      "node",
+      "@cloudflare/workers-types"
+    ],
     "skipLibCheck": true,
     "isolatedModules": true,
     "noUncheckedIndexedAccess": true,
     "resolveJsonModule": true,
     "noEmit": true
   },
-  "include": ["src", "test", "scripts"]
+  "include": [
+    "src",
+    "test",
+    "scripts"
+  ]
 }

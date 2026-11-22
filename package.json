@@ -29,6 +29,9 @@
     "./import": {
       "types": "./dist/import/index.d.ts",
       "default": "./dist/import/index.js"
+    },
+    "./worker": {
+      "default": "./dist/worker/index.js"
     }
   },
   "files": [
@@ -40,20 +43,25 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "rm -rf dist && tsc -p tsconfig.build.json && chmod +x dist/cli/index.js",
-    "typecheck": "tsc --noEmit",
+    "build": "node scripts/version.mjs && rm -rf dist && tsc -p tsconfig.build.json && chmod +x dist/cli/index.js",
+    "typecheck": "node scripts/version.mjs && tsc --noEmit",
     "test": "vitest run",
     "fixtures": "tsx scripts/make-fixtures.ts && tsx scripts/make-misa-fixture.ts"
   },
   "dependencies": {
+    "@cloudflare/workers-oauth-provider": "1.2.4",
+    "@modelcontextprotocol/server": "2.4.0",
     "fflate": "0.8.3",
-    "yaml": "2.9.1"
+    "yaml": "2.9.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "5.20261121.1",
     "@types/node": "26.6.6",
     "tsx": "4.23.15",
     "typescript": "7.0.2",
-    "vitest": "5.1.1"
+    "vitest": "5.1.1",
+    "wrangler": "4.166.0"
   },
   "bin": {
     "ownledger": "./dist/cli/index.js"

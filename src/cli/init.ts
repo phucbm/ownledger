@@ -2,7 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { createInterface } from "node:readline/promises";
-import { scaffold } from "../node/scaffold.js";
+import { pkgVersion, scaffold } from "../node/scaffold.js";
 
 function opt(args: string[], name: string): string | undefined {
   const i = args.indexOf(name);
@@ -35,7 +35,7 @@ export async function cmdInit(args: string[]): Promise<number> {
     const base = (opt(args, "--base") ?? (await ask("Base currency", "VND"))).toUpperCase();
     const lang = (opt(args, "--lang") ?? (await ask("Category language (vi/en)", "vi"))) === "en" ? "en" : "vi";
     const owner = opt(args, "--owner") ?? sh("gh", ["api", "user", "--jq", ".login"]) ?? undefined;
-    const version = JSON.parse(readFileSync(new URL("../../package.json", import.meta.url), "utf8")).version as string;
+    const version = pkgVersion();
 
     const files = scaffold({ name, base, lang, owner, version });
     const dep = opt(args, "--dep"); // e.g. file:../ownledger during development

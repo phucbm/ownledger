@@ -1,4 +1,6 @@
+import { fileURLToPath } from "node:url";
 import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { stringify } from "yaml";
 import { defaultCategories } from "../engine/defaults.js";
 import type { FileMap } from "../engine/load.js";
@@ -15,12 +17,17 @@ export interface ScaffoldOpts {
 const CURRENCY_NAMES: Record<string, string> = { VND: "Việt Nam đồng", USD: "US dollar", EUR: "Euro" };
 const DECIMALS: Record<string, number> = { VND: 0, JPY: 0, KRW: 0 };
 
-export function pkgRoot(): URL {
-  return new URL("../../", import.meta.url);
+/** Absolute path of a file in the installed ownledger package (works from src/ and dist/). */
+export function pkgPath(rel: string): string {
+  return join(dirname(fileURLToPath(import.meta.url)), "..", "..", rel);
 }
 
 export function readPkgFile(rel: string): string {
-  return readFileSync(new URL(rel, pkgRoot()), "utf8");
+  return readFileSync(pkgPath(rel), "utf8");
+}
+
+export function pkgVersion(): string {
+  return (JSON.parse(readPkgFile("package.json")) as { version: string }).version;
 }
 
 /** The files `init` writes into a new data repo. */

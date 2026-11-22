@@ -17,3 +17,8 @@ jobs:
       - run: pnpm test
       - run: pnpm build
       - run: node dist/cli/index.js check fixtures/demo
+      - name: Worker end to end (dev mode, demo data)
+        run: |
+          node dist/cli/index.js dev fixtures/demo --port 8787 > dev.log 2>&1 &
+          for i in $(seq 1 60); do curl -s -o /dev/null localhost:8787/ && break; sleep 1; done
+          node scripts/smoke-mcp.mjs http://localhost:8787 || (cat dev.log; exit 1)
