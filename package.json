@@ -1,6 +1,6 @@
 {
   "name": "ownledger",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Personal finance ledger used through AI chat (MCP). Your data in your own private GitHub repo, served by your own Cloudflare Worker.",
   "license": "MIT",
   "author": "phucbm",

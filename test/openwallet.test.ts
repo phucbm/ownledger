@@ -1,8 +1,8 @@
 import { join } from "node:path";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { checkFiles } from "../src/engine/index.js";
 import { readDataDir } from "../src/node/files.js";
-import { bestCard } from "../src/worker/bestcard.js";
+import { bestCard, clearSearchCache } from "../src/worker/bestcard.js";
 import { OpenWalletError, openWalletClient, type OpenWallet } from "../src/worker/openwallet.js";
 import { connect } from "./mcp-memory.js";
 
@@ -59,6 +59,7 @@ function fakeOw(over: Partial<Record<string, (a: any) => unknown>> = {}) {
 const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/đ/g, "d").toLowerCase();
 
 describe("best_card", () => {
+  beforeEach(() => clearSearchCache());
   it("finds the card by product name, sends this period's spend and cashback, adds the owner's figures", async () => {
     const { ow, calls } = fakeOw();
     const r: any = await bestCard(L, ASOF, ow, { amount: 300000, kind: "groceries", category: "food/groceries" });
@@ -142,6 +143,38 @@ describe("OpenWallet client", () => {
     expect(seen.slice(1).every((s) => s.session === "s1")).toBe(true);
   });
 
+  it("retries once after a 429 or a timeout, and keeps at most 4 requests in flight", async () => {
+    let inFlight = 0;
+    let most = 0;
+    let first429 = true;
+    const fetchImpl = vi.fn(async (_u: unknown, init: any) => {
+      const body = JSON.parse(init.body);
+      if (body.method === "initialize") return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: {} }), { headers: { "content-type": "application/json" } });
+      if (!body.id) return new Response(null, { status: 202 });
+      if (first429) {
+        first429 = false;
+        return new Response("slow down", { status: 429 });
+      }
+      inFlight++;
+      most = Math.max(most, inFlight);
+      await new Promise((r) => setTimeout(r, 5));
+      inFlight--;
+      return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: { structuredContent: { q: body.params.arguments.q } } }), { headers: { "content-type": "application/json" } });
+    });
+    const c = openWalletClient("u", fetchImpl as unknown as typeof fetch, 1);
+    const qs = Array.from({ length: 12 }, (_, i) => `card ${i}`);
+    const out = await Promise.all(qs.map((q) => c.call("search_cards", { q })));
+    expect(out.map((o: any) => o.q)).toEqual(qs);
+    expect(most).toBeLessThanOrEqual(4);
+    const always429 = openWalletClient("u", vi.fn(async (_u: unknown, init: any) => {
+      const body = JSON.parse(init.body);
+      if (body.method === "initialize") return new Response(JSON.stringify({ jsonrpc: "2.0", id: body.id, result: {} }), { headers: { "content-type": "application/json" } });
+      if (!body.id) return new Response(null, { status: 202 });
+      return new Response("", { status: 429 });
+    }) as unknown as typeof fetch, 1);
+    await expect(always429.call("about", {})).rejects.toThrow(/429/);
+  });
+
   it("tool errors and HTTP errors become OpenWalletError", async () => {
     const answer = (status: number, result?: object) =>
       vi.fn(async (_u: unknown, init: any) => {
@@ -152,7 +185,7 @@ describe("OpenWallet client", () => {
       });
     const bad = openWalletClient("u", answer(200, { isError: true, content: [{ type: "text", text: "Unknown intent" }] }) as unknown as typeof fetch);
     await expect(bad.call("rank_cards_for_spend", {})).rejects.toThrow(/Unknown intent/);
-    const limited = openWalletClient("u", answer(429) as unknown as typeof fetch);
+    const limited = openWalletClient("u", answer(429) as unknown as typeof fetch, 1);
     await expect(limited.call("about", {})).rejects.toThrow(/429 \(rate limited/);
   });
 });
@@ -165,5 +198,16 @@ describe("--openwallet flag", async () => {
     expect(openwalletFlag(["--no-openwallet"])).toBeNull();
     expect(openwalletFlag(["--yes"])).toBeUndefined();
     expect(() => openwalletFlag(["--openwallet=nope"])).toThrow(/http\(s\) URL/);
+  });
+});
+
+describe("best_card search cache", () => {
+  it("looks a card up once an hour, not on every question", async () => {
+    clearSearchCache();
+    const { ow, calls } = fakeOw();
+    await bestCard(L, ASOF, ow, { amount: 1000, kind: "groceries" });
+    await bestCard(L, ASOF, ow, { amount: 2000, kind: "groceries" });
+    expect(calls.filter((c) => c.tool === "search_cards").length).toBe(1);
+    expect(calls.filter((c) => c.tool === "rank_cards_for_spend").length).toBe(2);
   });
 });
