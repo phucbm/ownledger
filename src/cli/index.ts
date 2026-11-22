@@ -2,6 +2,7 @@
 import { readFileSync } from "node:fs";
 import { pkgVersion } from "../node/scaffold.js";
 import { cmdCheck } from "./check.js";
+import { cmdDeploy } from "./deploy.js";
 import { cmdDev } from "./dev.js";
 import { cmdImport } from "./import.js";
 import { cmdInit } from "./init.js";
@@ -15,6 +16,7 @@ Usage: ownledger <command> [options]
   init [name]          Create a data repo (asks base currency, category language; private GitHub repo via gh)
   check [dir]          Check the data repo (default: current folder)
   import <file>        Import an export (profile first; preview; --yes writes, checks and commits)
+  deploy               Deploy your Worker to your Cloudflare (GitHub App, secrets, KV); prints the connector URL
   dev [dir]            Run your Worker locally against the local data/ (fake sign-in)
   --version            Print the version
 `;
@@ -24,6 +26,7 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
   check: cmdCheck,
   import: cmdImport,
   dev: cmdDev,
+  deploy: cmdDeploy,
 };
 
 async function main(argv: string[]): Promise<number> {

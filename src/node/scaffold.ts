@@ -49,18 +49,14 @@ export function scaffold(o: ScaffoldOpts): FileMap {
         type: "module",
         scripts: { check: "ownledger check", import: "ownledger import", deploy: "ownledger deploy", dev: "ownledger dev" },
         dependencies: { ownledger: `^${o.version}` },
+        devDependencies: { wrangler: "^4.166.0" },
       },
       null,
       2,
     ) + "\n",
     ".gitignore": "node_modules/\n.wrangler/\n.dev.vars\n.env*\n.DS_Store\n",
   };
-  for (const t of ["AGENTS.md", "README.md", ".github/workflows/check.yml", ".github/dependabot.yml"]) {
-    try {
-      files[t] = readPkgFile(`templates/repo/${t}`).replaceAll("{{name}}", o.name);
-    } catch {
-      /* templates are added in later phases */
-    }
-  }
+  for (const t of ["README.md", ".github/workflows/check.yml", ".github/dependabot.yml"]) files[t] = readPkgFile(`templates/repo/${t}`).replaceAll("{{name}}", o.name);
+  files["AGENTS.md"] = readPkgFile("AGENTS.md");
   return files;
 }

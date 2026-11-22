@@ -1,0 +1,11 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly }
+    allow:
+      - dependency-name: ownledger
+    # patch and minor updates never need a data migration; majors are reviewed by hand
+    ignore:
+      - dependency-name: ownledger
+        update-types: ["version-update:semver-major"]
