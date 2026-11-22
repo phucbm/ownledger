@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.2.1 (2026-11-22)
+
+- `best_card` is sturdier with many cards: at most 4 requests to OpenWallet at a time, one retry after a timeout or
+  a 429, and card lookups kept in the Worker's memory for an hour (never written anywhere).
+
 ## 1.2.0 (2026-11-22)
 
 - `cards` shows each card's current statement period: what was spent by category, refunds, and cashback credited

@@ -30,6 +30,12 @@ interface NotMatched {
 const key = (s: string) => fold(s).replace(/[^a-z0-9]/g, "");
 const isDebit = (t: unknown) => (Array.isArray(t) ? t.includes("debit") && !t.includes("credit") : t === "debit");
 
+type OwCard = { id: string; name: string; bank: string; type?: unknown; url?: string; lastChecked?: string | null };
+/** search results kept in this Worker's memory for an hour (never written anywhere): fewer calls to OpenWallet */
+const SEARCH_TTL_MS = 60 * 60 * 1000;
+const searchCache = new Map<string, { cards: OwCard[]; until: number }>();
+export const clearSearchCache = () => searchCache.clear();
+
 async function findCard(ow: OpenWallet, c: CardStatus): Promise<Found | NotMatched> {
   const product = c.product ?? c.name;
   const miss = (why: string, candidates?: { id: string; name: string }[]): NotMatched => ({
@@ -39,7 +45,14 @@ async function findCard(ow: OpenWallet, c: CardStatus): Promise<Found | NotMatch
     why,
     ...(candidates?.length ? { candidates } : {}),
   });
-  const search = async (q: string) => ((await ow.call("search_cards", { q, limit: 10 }))?.cards ?? []) as { id: string; name: string; bank: string; type?: unknown; url?: string; lastChecked?: string | null }[];
+  const search = async (q: string) => {
+    const k = `${ow.url}|${q}`;
+    const hit = searchCache.get(k);
+    if (hit && hit.until > Date.now()) return hit.cards;
+    const cards = ((await ow.call("search_cards", { q, limit: 10 }))?.cards ?? []) as OwCard[];
+    searchCache.set(k, { cards, until: Date.now() + SEARCH_TTL_MS });
+    return cards;
+  };
   const sameBank = (xs: Awaited<ReturnType<typeof search>>) => {
     if (!c.bank) return xs;
     const b = key(c.bank);

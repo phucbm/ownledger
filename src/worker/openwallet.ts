@@ -4,7 +4,9 @@
 // and the cashback booked this statement period. Never account ids, notes, balances or anything else.
 
 export const OPENWALLET_DEFAULT_URL = "https://mcp.openwallet.vn/mcp";
-const TIMEOUT_MS = 10_000;
+const TIMEOUT_MS = 15_000;
+/** at most this many requests in flight to OpenWallet (it rate-limits per caller) */
+const MAX_IN_FLIGHT = 4;
 
 export class OpenWalletError extends Error {}
 
@@ -36,22 +38,47 @@ async function rpcBody(res: Response, id: number): Promise<any> {
 }
 
 /** A minimal MCP client over Streamable HTTP: initialize once, then tools/call. */
-export function openWalletClient(url: string, fetchImpl: Fetch = fetch): OpenWallet {
+export function openWalletClient(url: string, fetchImpl: Fetch = fetch, retryDelayMs = 1500): OpenWallet {
   let session: Promise<{ id?: string; protocol: string }> | null = null;
   let n = 0;
+  let inFlight = 0;
+  const queue: (() => void)[] = [];
+  const slot = async () => {
+    if (inFlight >= MAX_IN_FLIGHT) await new Promise<void>((r) => queue.push(r));
+    inFlight++;
+  };
+  const release = () => {
+    inFlight--;
+    queue.shift()?.();
+  };
 
   const post = async (body: object, sessionId?: string, protocol?: string) => {
     const headers: Record<string, string> = { "content-type": "application/json", accept: "application/json, text/event-stream" };
     if (sessionId) headers["mcp-session-id"] = sessionId;
     if (protocol) headers["mcp-protocol-version"] = protocol;
-    let res: Response;
-    try {
-      res = await fetchImpl(url, { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(TIMEOUT_MS) });
-    } catch (e) {
-      throw new OpenWalletError(`OpenWallet did not answer (${(e as Error).name === "TimeoutError" ? "timeout" : (e as Error).message})`);
+    // one retry after a timeout, a network error or a 429
+    for (let attempt = 0; ; attempt++) {
+      await slot();
+      let res: Response | null = null;
+      let failure: string | null = null;
+      try {
+        res = await fetchImpl(url, { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(TIMEOUT_MS) });
+      } catch (e) {
+        failure = `OpenWallet did not answer (${(e as Error).name === "TimeoutError" ? "timeout" : (e as Error).message})`;
+      } finally {
+        release();
+      }
+      if (res && res.status === 429) failure = "OpenWallet answered 429 (rate limited: try again in a minute)";
+      if (failure) {
+        if (attempt === 0) {
+          await new Promise((r) => setTimeout(r, retryDelayMs));
+          continue;
+        }
+        throw new OpenWalletError(failure);
+      }
+      if (!res!.ok && res!.status !== 202) throw new OpenWalletError(`OpenWallet answered ${res!.status}`);
+      return res!;
     }
-    if (!res.ok && res.status !== 202) throw new OpenWalletError(`OpenWallet answered ${res.status}${res.status === 429 ? " (rate limited: try again in a minute)" : ""}`);
-    return res;
   };
 
   const init = async () => {
