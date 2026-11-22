@@ -1,6 +1,6 @@
 # 002: cards this period, question evals, and an opt-in OpenWallet source
 
-Written: 2026-11-22. Status: Released (1.2.0); OpenWallet v2 deploy left
+Written: 2026-11-22. Status: Done 2026-11-22 (1.2.1 live)
 
 ## Goal
 
@@ -57,9 +57,13 @@ cashback **given what each card has already spent and earned this statement peri
   the period's cashback, candidates only from the owner's bank).
 - 2026-11-22 Merged: ownledger#1, openwalletvn/openwallet-data#20 and #21, openwalletvn/openwallet-mcp-v2#7.
   Published: `@openwalletvn/engine` 0.1.2 (GitHub Packages), `ownledger` 1.2.0 (npm, with provenance).
-- Left for the owner: deploy openwallet-mcp-v2 (its README "Deploy"; switch the engine to the registry 0.1.2),
-  then in `my-money` update ownledger, `ownledger deploy --openwallet`, and set `details.product` / `details.bank`
-  on the real cards.
+- 2026-11-22 Live: openwallet-mcp-v2 already deployed on mcp.openwallet.vn with the new inputs. `my-money` on 1.2.1
+  with `OPENWALLET_URL` set; 9 cards have `details.bank` / `details.product`; Woori Visa Platinum *1926 (downgraded
+  to Gold) merged into `woori-gold` with a note, the 178,300 owed carried over (owner). 1.2.1: at most 4 requests in
+  flight, one retry, search results cached in memory (13 parallel searches timed out live).
+- Open: the branch `plan-002-new-dashboard` also numbers its plan 002 and touches cards; rename one plan and merge
+  main into it. The local `my-money` checkout has 2 unpushed tracker commits (17:54) that need a rebase onto
+  origin (conflict in `data/accounts.yaml`: re-run the tracker on top).
 
 ## Later
 
