@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 (2026-11-22)
 
 - `cards` shows each card's current statement period: what was spent by category, refunds, and cashback credited
   (`period`), plus `bank` and `product` from the card's details. `all: true` lists every open card, also those
