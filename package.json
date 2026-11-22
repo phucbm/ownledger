@@ -25,11 +25,16 @@
     ".": {
       "types": "./dist/engine/index.d.ts",
       "default": "./dist/engine/index.js"
+    },
+    "./import": {
+      "types": "./dist/import/index.d.ts",
+      "default": "./dist/import/index.js"
     }
   },
   "files": [
     "dist",
     "assets",
+    "presets",
     "templates",
     "AGENTS.md",
     "CHANGELOG.md"
@@ -38,9 +43,10 @@
     "build": "rm -rf dist && tsc -p tsconfig.build.json && chmod +x dist/cli/index.js",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "fixtures": "tsx scripts/make-fixtures.ts"
+    "fixtures": "tsx scripts/make-fixtures.ts && tsx scripts/make-misa-fixture.ts"
   },
   "dependencies": {
+    "fflate": "0.8.3",
     "yaml": "2.9.1"
   },
   "devDependencies": {

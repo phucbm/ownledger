@@ -1,0 +1,53 @@
+# MISA Sổ Thu Chi export ("Bảng kê thu chi", xlsx, one sheet per wallet).
+# The reading rules below are fixed for this app. The AI fills `accounts`, `categories` and
+# `uncategorized` from `ownledger import <file> --profile`, and the owner reviews them.
+source: misa
+reader: table
+sheets: all
+header_row: 10
+account_from: sheet
+date_format: dd/mm/yyyy
+columns:
+  date: Ngày
+  time: Giờ
+  in: Số tiền thu
+  out: Số tiền chi
+  balance: Số dư
+  category: Hạng mục cha
+  subcategory: Hạng mục con
+  who: Chi cho ai
+  event: Chuyến đi/Sự kiện
+  note: Diễn giải
+totals:
+  opening: Số dư đầu kì
+  closing: Số dư cuối kì
+  in: Tổng thu
+  out: Tổng chi
+# Transfers have no category; the note names the other wallet, sometimes after a prefix:
+# "Chuyển tới X", "Gửi tiết kiệm tài khoản N (Chuyển tới X)", "Tất toán sổ tiết kiệm N (Chuyển từ X)".
+transfers:
+  only_without_category: true
+  out: "\\(?Chuyển tới (?<wallet>.+?)\\)?$"
+  in: "\\(?Chuyển từ (?<wallet>.+?)\\)?$"
+
+# Sheet name (as in the file) → account. Sheet names are cut to 31 characters and repeated names get
+# a _NN suffix; put the full wallet name(s) from the transfer notes in `names`.
+# Lift facts users write into wallet names (card statement/due day, deposit term and start) into details.
+accounts:
+  "cash": { id: cash, name: Tiền mặt, type: cash, opened: 2025-01-01 }
+  "vcb visa _1234 🗓️20💸5 hạn mức": { id: card-vcb, name: VCB Visa, type: credit_card, names: ["vcb visa _1234 🗓️20💸5 hạn mức 50tr chính"], details: { statement_day: 20, due_day: 5, limit: 50000000 } }
+  "gửi 6 tháng từ 01_07_2025": { id: dep-20250701, name: Gửi 6 tháng từ 01/07/2025, type: deposit, closed: 2026-01-01, names: ["gửi 6 tháng từ 01/07/2025"], details: { term_months: 6, start: 2025-07-01, rate: 5.2 } }
+  "momo": { id: momo, name: MoMo, type: ewallet }
+  "momo_4": { id: momo-2, name: MoMo (ví 2), type: ewallet }
+  "chứng chỉ quỹ": { id: funds, name: Chứng chỉ quỹ, type: fund }
+categories:
+  "Chi tiêu hàng ngày/Ăn uống": food/eating-out
+  "Chi tiêu hàng ngày/Đi lại": transport/fares
+  "Chi tiêu không thường xuyên/Mua sắm lớn": shopping/big-purchases
+  "Chi tiêu không thường xuyên/Hiếu hỉ": family/gifts-weddings
+  "Hoá đơn/Internet": home/internet
+  "Tiền vào": other-income
+  "Tiền vào/Tiền lãi": interest
+  "Tiền vào/Hoàn tiền": cashback
+uncategorized:
+  - { match: "bán đồ", category: other-income, sign: in }

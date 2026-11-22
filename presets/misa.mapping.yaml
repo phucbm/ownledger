@@ -1,0 +1,49 @@
+# MISA Sổ Thu Chi export ("Bảng kê thu chi", xlsx, one sheet per wallet).
+# The reading rules below are fixed for this app. The AI fills `accounts`, `categories` and
+# `uncategorized` from `ownledger import <file> --profile`, and the owner reviews them.
+source: misa
+reader: table
+sheets: all
+header_row: 10
+account_from: sheet
+date_format: dd/mm/yyyy
+columns:
+  date: Ngày
+  time: Giờ
+  in: Số tiền thu
+  out: Số tiền chi
+  balance: Số dư
+  category: Hạng mục cha
+  subcategory: Hạng mục con
+  who: Chi cho ai
+  event: Chuyến đi/Sự kiện
+  note: Diễn giải
+totals:
+  opening: Số dư đầu kì
+  closing: Số dư cuối kì
+  in: Tổng thu
+  out: Tổng chi
+# Transfers have no category; the note names the other wallet, sometimes after a prefix:
+# "Chuyển tới X", "Gửi tiết kiệm tài khoản N (Chuyển tới X)", "Tất toán sổ tiết kiệm N (Chuyển từ X)".
+transfers:
+  only_without_category: true
+  out: "\\(?Chuyển tới (?<wallet>.+?)\\)?$"
+  in: "\\(?Chuyển từ (?<wallet>.+?)\\)?$"
+
+# Sheet name (as in the file) → account. Sheet names are cut to 31 characters and repeated names get
+# a _NN suffix; put the full wallet name(s) from the transfer notes in `names`.
+# Lift facts users write into wallet names (card statement/due day, deposit term and start) into details.
+accounts: {}
+#  "cash": { id: cash, name: Tiền mặt, type: cash }
+#  "vcb _1234 🗓️20💸5": { id: card-vcb, name: VCB Visa, type: credit_card, names: ["vcb _1234 🗓️20💸5"], details: { statement_day: 20, due_day: 5 } }
+#  "gửi 6 tháng từ 01_07_2025": { id: dep-20250701, name: Gửi 6 tháng từ 01/07/2025, type: deposit, names: ["gửi 6 tháng từ 01/07/2025"], details: { term_months: 6, start: 2025-07-01 } }
+
+# "Hạng mục cha/Hạng mục con" (or just the parent) → ownledger category path.
+categories: {}
+#  "Chi tiêu hàng ngày/Ăn uống": food/eating-out
+
+# Rows with no category that are not transfers (MISA allows income with only a note).
+uncategorized: []
+#  - { match: "lãi", category: interest, sign: in }
+# uncategorized_in: other-income
+# uncategorized_out: other
