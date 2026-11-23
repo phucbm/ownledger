@@ -273,8 +273,10 @@ describe("ownledger statements reconcile (CLI)", () => {
   it("--save-bank-amounts previews, then saves and commits with --yes", async () => {
     const dir = repo();
     execFileSync("git", ["init", "-q"], { cwd: dir });
-    execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "add", "."], { cwd: dir });
-    execFileSync("git", ["-c", "user.email=t@t", "-c", "user.name=t", "commit", "-qm", "init"], { cwd: dir });
+    execFileSync("git", ["config", "user.email", "t@example.com"], { cwd: dir });
+    execFileSync("git", ["config", "user.name", "t"], { cwd: dir });
+    execFileSync("git", ["add", "."], { cwd: dir });
+    execFileSync("git", ["commit", "-qm", "init"], { cwd: dir });
     const p = await run(["reconcile", "card-x", "--dir", dir, "--save-bank-amounts"]);
     expect(p.out).toMatch(/Preview only/);
     expect(() => readFileSync(join(dir, "data/cards/statements.yaml"))).toThrow();
