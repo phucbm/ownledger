@@ -287,6 +287,7 @@ export const vi: Dict = {
   "cards.noStatementDay": "Chưa đặt ngày sao kê nên chưa tính được sao kê.",
   "cards.lastStatement": "Sao kê gần nhất",
   "cards.statementOf": "Sao kê ngày {date}",
+  "cards.statementPdf": "Sao kê PDF",
   "cards.amountDue": "Số tiền phải trả",
   "cards.dueDate": "Hạn thanh toán",
   "cards.paid": "Đã trả",

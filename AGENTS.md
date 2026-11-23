@@ -20,6 +20,9 @@ amounts, and never write without the owner's go. `npx ownledger check` must pass
 | `data/ledger/yyyy/mm.jsonl` | One transaction per line, in the month file of its date |
 | `imports/raw/` | Original exports, kept as received |
 | `imports/<source>.mapping.yaml` | How to read one app's export (see below) |
+| `imports/statements/<account-id>/<YYYY-MM>.pdf` | Optional: the bank's statement PDFs, unlocked (see Bank statements) |
+| `imports/statements/sources.yaml` | Optional: how to find each card's statements in email |
+| `.env.statements` | The statement passwords, on the owner's computer only (git-ignored; never commit, never print) |
 
 ## Transactions
 
@@ -72,6 +75,48 @@ A 0% instalment is a plan `{kind: instalment, account: <card>, principal, count,
 `query` and `chart` for `type: chart`, options like `period`, `account`), and `prefs.pool` (the "My money" pool: `on`, `name`,
 `exclude: [ids]`, `default_account`). The pool is a view only: accounts stay separate in the data. With the pool on, spending with
 no account named goes to `default_account`. Change widgets through the connector's `add_widget` / `edit_widget` / `remove_widget`.
+
+## Bank statements
+
+The bank's own statement PDFs can be kept in the repo, one per card per statement:
+`imports/statements/<account-id>/<YYYY-MM>.pdf`. `YYYY-MM` is the month of the statement's **close date** (the
+period's last day), not the month the bank sent it: a period 01–31/10 sent on 05/11 is `2026-10.pdf`. They are stored
+**unlocked**. Only the owner's computer reads them (this CLI); the Worker only hands a filed PDF to the signed-in
+dashboard ("Statement PDF" on a statement) and never reads it. Optional: a repo without statements works the same.
+
+`imports/statements/sources.yaml`, per account id: `from` (the bank's sender address), `subject` (words in the subject),
+`password` (the name of the variable in `.env.statements`, e.g. `PW_WOORI`), `password_hint` (what the password is made
+of, e.g. "date of birth ddmmyy"; never the password itself). The bank's own email facts, nothing else.
+
+Passwords live in `.env.statements` at the repo root (`PW_<ACCOUNT_ID>=…` or `PW_<BANK>=…`, the first word of the id;
+or the variable `sources.yaml` names). It is git-ignored. Never commit it, print it, or send it anywhere.
+
+### Collect statements from Gmail
+
+Needs an agent that can save files on the owner's computer (Claude Code, Codex…) with a Gmail connector. ownledger
+itself never connects to email.
+
+1. For each card (or the one asked for): search Gmail with `sources.yaml`'s `from`/`subject` if it has the card;
+   otherwise find the bank's statement emails and propose a `sources.yaml` entry for the owner's go.
+2. Download the PDF attachments to a temporary folder **outside** the repo.
+3. If the password variable is missing from `.env.statements`, ask the owner for the password once and write it
+   there (never echo it, never commit it).
+4. `npx ownledger statements add <account-id> <files…>`: it unlocks each file, reads its statement period from the
+   text (or refuses and asks for `--month YYYY-MM`) and shows card, month and period. Already-filed statements are
+   skipped; a different file for a month already filed is refused. Show the owner the list, get their go, then run it
+   again with `--yes` (files and commits).
+5. `npx ownledger statements list` shows which months are missing between the first and the last; report them.
+
+### Check a statement against the ledger
+
+`npx ownledger statements check <account-id> <YYYY-MM>` (`--json` for structured output) prints the period,
+ownledger's figures for it, its transactions on the card, and the statement's text. Compare them and tell the owner
+what's missing, extra or different (amounts, dates, fees, cashback, the closing balance). Never change anything from
+the PDF on your own: each fix is a normal write (preview → go). The bank's statement amount goes in with
+`add_statement_amount`.
+
+`npx ownledger check` warns about statement files that don't fit (a folder that isn't an account, a name that isn't
+`YYYY-MM.pdf`, a PDF still locked).
 
 ## Rules for writes
 

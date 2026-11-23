@@ -287,6 +287,7 @@ export const en: Dict = {
   "cards.noStatementDay": "No statement day is set, so statements cannot be worked out.",
   "cards.lastStatement": "Last statement",
   "cards.statementOf": "Statement of {date}",
+  "cards.statementPdf": "Statement PDF",
   "cards.amountDue": "Amount due",
   "cards.dueDate": "Due date",
   "cards.paid": "Paid",

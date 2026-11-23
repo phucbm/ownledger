@@ -1,6 +1,6 @@
 # 004: Bank statements: collect from Gmail, open in the dashboard, check transactions
 
-Written: 2026-11-23. Status: In progress
+Written: 2026-11-23. Status: In progress (2.1.0 released; step 7 open)
 Related: plan 002 (cards, statement periods), plan 003 (dashboard)
 
 ## Goal
@@ -122,3 +122,16 @@ locked with a made-up password), never real statements.
 - ownledger connecting to Gmail itself (a "Collect statements" button). Decided against for now.
 - Filling the bank's statement amount (`add_statement_amount`) from the PDF automatically.
 - Bank account (non-card) statements; the same convention can cover them later.
+
+## Progress
+
+- 2026-11-23 Steps 1–6 done on `plan-004-statement-pdfs`; released as 2.1.0 on the owner's go ("cut new release").
+  Statements are read on the user's computer only (decision above); step 5 became `ownledger statements check`
+  (built in step 2). Tried on the owner's data repo: `statements list` (17 Woori statements, 2025-11 missing), month
+  detection 17/17 from the PDFs' text (Woori writes `yyyy.mm.dd`), `add` preview says "already filed",
+  `statements check` lines up 2026-10, and through `ownledger dev` the PDF route returns the filed bytes with the
+  right headers (404 for a missing month). The dashboard link was not seen in a browser.
+- Open (step 7): collect one more bank end to end with an agent (new folders kbank, msb-mdigi, msb-vs, vib-familylink
+  are in the owner's working copy, untracked, made outside this run), deploy `my-money` on 2.1.0, look at the link
+  in the dashboard.
+
