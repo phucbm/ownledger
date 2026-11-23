@@ -11,7 +11,7 @@ Related: plan 004 (statement PDFs, `ownledger statements check`), plan 002 (card
      Engine bug found: editing only `amount` on a 0-amount row reads it as income (`kind` from the sign of 0), so the account gets +amount. Workaround: pass `kind`. Fix in ownledger: take the kind from the category's side (expense/income) when the amount is 0.
   2. MSB (`msb-mdigi`): the closing figures have no labels. Read them off each PDF and save them as `statement_amount` ops in one batch.
   3. Woori: one account, two cards over time (Platinum ****1926, then downgraded to Gold ****1435; owner, 2026-11-23). The 2026-01 file stays. Reconcile lists the 2026-01-06 payment of 1,244,648 from cash as on no statement: check the old card's statement before changing anything.
-- Next step: 2 (MSB), then 3 (Woori). my-money pushed 2026-11-23. Data fixes run locally in my-money through the engine (owner, 2026-11-23: "i dont expect this to run remotely anywhere!"), not through the connector.
+- Next step: 2 (MSB), then 3 (Woori). my-money pushed 2026-11-23. Data fixes run locally in my-money with `node scripts/batch.mjs temp/<ops>.json` (preview; `--yes` writes; then check and commit), never through the connector (owner, 2026-11-23: "i dont expect this to run remotely anywhere!").
 
 ## Goal
 
