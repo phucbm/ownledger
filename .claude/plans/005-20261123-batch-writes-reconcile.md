@@ -1,6 +1,6 @@
 # 005: Batch writes, and checking every statement of a card in one run
 
-Written: 2026-11-23. Status: In progress
+Written: 2026-11-23. Status: Done 2026-11-23 (2.2.0 deployed to my-money; the KBank fixes wait for the owner's go)
 Related: plan 004 (statement PDFs, `ownledger statements check`), plan 002 (card statements, bank's amount)
 
 ## Goal
@@ -70,7 +70,7 @@ Statement text is read only on the user's computer; the Worker still talks only 
 ## Progress (run 2026-11-23)
 
 - Steps 1–4 done: engine `batch()` (ops on the evolving files, check once, one message, balance change per account), MCP `batch` tool + `POST /api/batch` + `/api/batch/apply`, smoke-mcp batch (3 adds, then one batch voiding them), layout-keeping extraction (`src/node/statement-rows.ts`), `statements reconcile` (`src/node/reconcile.ts`), tests with generated bank-like PDFs.
-- Step 5: AGENTS.md, README, CHANGELOG, connector instructions; release 2.2.0.
+- Step 5: AGENTS.md, README, CHANGELOG, connector instructions; PR #6, release v2.2.0 (npm), my-money bumped and deployed (`about` says 2.2.0).
 - Step 6 on the owner's repo (read only; nothing committed there):
   - `woori-gold` (needs `amount_column: 1` in `sources.yaml`: the transaction amount comes first, the last column is points): 116 rows matched, 17 fee+VAT pairs joined. The only gaps are the three known ones: 2025-05 (+10,000, timing), 2026-04 (+500,000, timing), the 29,821 credit (2026-09/10). One ledger row on no statement: the 2026-01-06 payment of 1,244,648 from cash. The 2026-01 PDF filed for woori-gold is for another card (Visa Gold ****1435, not the Platinum ****1926 of the other months) and has no rows.
   - `kbank`: the closing figures read, gaps are real (mostly DCC VAT and FX markup VAT rows not on the ledger). Fixes prepared for the owner as one batch (needs categories and the owner's go).
