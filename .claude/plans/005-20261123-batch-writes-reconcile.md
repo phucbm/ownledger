@@ -1,7 +1,16 @@
 # 005: Batch writes, and checking every statement of a card in one run
 
-Written: 2026-11-23. Status: Done 2026-11-23 (2.2.0 deployed to my-money; the KBank fixes wait for the owner's go)
+Written: 2026-11-23. Status: Done 2026-11-23 (2.3.0 deployed to my-money; data fixes left for a separate session)
 Related: plan 004 (statement PDFs, `ownledger statements check`), plan 002 (card statements, bank's amount)
+
+## Where it stands
+
+- Done: all infra. 2.2.0 (batch, statements reconcile) and 2.3.0 (batch op `statement_amount`) are released and deployed to my-money. The live connector reports 2.3.0, check has 0 errors.
+- Open: data fixes in my-money, in their own session (owner, 2026-11-23: "not the job here, get the infra ready! we will run those in other session"):
+  1. KBank: about 50 statement rows missing on the ledger (mostly DCC VAT and FX-markup VAT, plus a few purchases). `npx ownledger statements reconcile kbank --json`, then fill in categories and apply as one `batch`.
+  2. MSB (`msb-mdigi`): the closing figures have no labels. Read them off each PDF and save them as `statement_amount` ops in one batch.
+  3. Woori: one account, two cards over time (Platinum ****1926, then downgraded to Gold ****1435; owner, 2026-11-23). The 2026-01 file stays. Reconcile lists the 2026-01-06 payment of 1,244,648 from cash as on no statement: check the old card's statement before changing anything.
+- Next step: start item 1 (KBank) in a new chat, so the connector shows the `batch` tool.
 
 ## Goal
 
