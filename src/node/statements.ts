@@ -6,6 +6,7 @@ import { addDays } from "../engine/dates.js";
 import type { ISODate } from "../engine/types.js";
 import { STATEMENTS_DIR } from "../modules/cards/files.js";
 import { closeOnOrAfter, prevClose } from "../modules/cards/statements.js";
+import type { StatementLayout } from "./statement-rows.js";
 
 /**
  * Bank statements (plan 004): imports/statements/<account-id>/<YYYY-MM>.pdf, unlocked.
@@ -149,7 +150,7 @@ export function readEnvFile(root: string): Record<string, string> {
   return out;
 }
 
-export interface StatementSource {
+export interface StatementSource extends StatementLayout {
   from?: string;
   subject?: string;
   /** Name of the variable in .env.statements. */

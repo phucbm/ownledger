@@ -21,7 +21,7 @@ import { yamlText } from "../engine/write.js";
 import { dashboardOf } from "./api.js";
 import { cardList } from "../modules/cards/index.js";
 import { cashback, closeOnOrAfter, feeWaiver, lineKind, nextClose, statements } from "../modules/cards/statements.js";
-import { cardsData, STATEMENTS_FILE, termsOf, recordFor } from "../modules/cards/terms.js";
+import { cardsData, STATEMENTS_FILE, termsOf, recordFor, withBankAmounts } from "../modules/cards/terms.js";
 import { parse as parseYaml } from "yaml";
 import { bestCard } from "./bestcard.js";
 import { openWalletClient, type OpenWallet } from "./openwallet.js";
@@ -548,9 +548,7 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
       preview((f) => {
         const { ledger } = A.loadForAction(f);
         if (!ledger.accounts.some((a) => a.id === account)) throw new A.ActionError(`no account ${account}`);
-        const list = cardsData(ledger).statements.filter((x) => !(x.account === account && x.statement_date === statement_date));
-        list.push({ account, statement_date, amount });
-        list.sort((x, y) => (x.statement_date < y.statement_date ? -1 : x.statement_date > y.statement_date ? 1 : x.account < y.account ? -1 : 1));
+        const list = withBankAmounts(ledger, [{ account, statement_date, amount }]);
         return A.plan(f, { putFiles: { [STATEMENTS_FILE]: yamlText(list) } }, `Card statement: ${account} ${statement_date}`);
       }),
     ),

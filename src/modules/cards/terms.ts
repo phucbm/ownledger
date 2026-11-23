@@ -141,6 +141,14 @@ export function cardsData(l: Ledger): CardsData {
   return (l.ext?.cards as CardsData | undefined) ?? { records: [], statements: [] };
 }
 
+/** data/cards/statements.yaml with these bank amounts set (one per account + statement date), sorted. */
+export function withBankAmounts(l: Ledger, set: BankStatement[]): BankStatement[] {
+  const key = (x: BankStatement) => `${x.account}|${x.statement_date}`;
+  const keys = new Set(set.map(key));
+  const list = [...cardsData(l).statements.filter((x) => !keys.has(key(x))), ...set];
+  return list.sort((x, y) => (x.statement_date < y.statement_date ? -1 : x.statement_date > y.statement_date ? 1 : x.account < y.account ? -1 : 1));
+}
+
 export function recordFor(l: Ledger, account: string): CardRecord | undefined {
   return cardsData(l).records.find((r) => r.account === account);
 }
