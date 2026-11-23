@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 2.3.1 (2026-11-23)
 
 - **Fix: editing only the amount of a 0-amount row** booked it as income (the kind came from the sign of 0), so the
   account went up instead of down. The kind now comes from the category's side (income or expense; expense for system
