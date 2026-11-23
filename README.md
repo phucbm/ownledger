@@ -58,6 +58,7 @@ Tools: `about`, `rules`, `accounts`, `transactions`, `report`, `net_worth`, `car
 | Your AI client | your Worker's `/mcp` with a token your Worker issued (1 h, refreshable 30 days, revocable in the dashboard) | your GitHub credentials |
 | GitHub sign-in | proves who you are; your Worker reads your login, then revokes that GitHub token at once | kept anywhere |
 | The CLI | GitHub (`gh`), Cloudflare (`wrangler`), npm | sending your data anywhere |
+| Bank statement PDFs (optional) | read only by the CLI on your computer; your Worker only streams a filed PDF to your signed-in dashboard | parsed by the Worker; their passwords leave your computer |
 
 Only the GitHub logins in `ALLOWED_LOGINS` (yours, set by `deploy`) can sign in. Writes are refused unless the whole ledger still passes `ownledger check`; your repo's CI runs the same check on every push.
 
@@ -72,6 +73,7 @@ data/plans.yaml         instalments, loans, premiums
 data/prices.csv         date,asset,price
 data/ledger/yyyy/mm.jsonl  one transaction per line; lines sum to 0
 imports/                raw exports + one mapping per source app
+imports/statements/     optional: your banks' statement PDFs, unlocked, <card>/<YYYY-MM>.pdf
 AGENTS.md               the rules any AI follows in this repo
 ```
 
@@ -98,7 +100,18 @@ ownledger check [dir]      check the data (CI runs it)
 ownledger import <file>    import an export (--profile, --preset misa, --yes)
 ownledger deploy           deploy or update your Worker (--openwallet / --no-openwallet)
 ownledger dev [dir]        run your Worker locally against the local folder (sign-in skipped; --openwallet[=<url>])
+ownledger statements add <card> <file.pdf>…   unlock and file bank statement PDFs (preview; --yes files and commits)
+ownledger statements list [<card>]            which months each card has, and which are missing
+ownledger statements check <card> <YYYY-MM>   the statement's text next to the ledger's figures for that period
 ```
+
+### Bank statements (optional)
+
+Keep your cards' statement PDFs in your data repo and open them from the dashboard. Collecting them from Gmail is done by
+your own AI agent on your computer (Claude Code or similar, with a Gmail connector), following
+[AGENTS.md](AGENTS.md#collect-statements-from-gmail); ownledger never connects to your email. `ownledger statements add`
+removes the bank's password (kept in `.env.statements`, git-ignored, on your computer only) and files each PDF under the
+month of its statement's close date. `ownledger statements check` lets your agent compare a statement with your ledger.
 
 ## Development
 

@@ -7,6 +7,7 @@ import { cmdDeploy } from "./deploy.js";
 import { cmdDev } from "./dev.js";
 import { cmdImport } from "./import.js";
 import { cmdInit } from "./init.js";
+import { cmdStatements } from "./statements.js";
 
 const pkg = { version: pkgVersion() };
 
@@ -20,6 +21,7 @@ Usage: ownledger <command> [options]
   cards load <csv>     Load a card tracker (CSV) into data/cards.yaml and the cards' limits (preview; --yes writes)
   deploy               Deploy your Worker to your Cloudflare (GitHub App, secrets, KV); prints the connector URL
                        --openwallet[=<url>] turns on the OpenWallet card catalog (best_card), --no-openwallet off
+  statements add|list|check  Bank statement PDFs in imports/statements/ (unlock and file, list months, compare with the ledger)
   dev [dir]            Run your Worker locally against the local data/ (fake sign-in); --openwallet[=<url>] as above
   --version            Print the version
 `;
@@ -29,6 +31,7 @@ const commands: Record<string, (args: string[]) => Promise<number>> = {
   check: cmdCheck,
   import: cmdImport,
   cards: cmdCards,
+  statements: cmdStatements,
   dev: cmdDev,
   deploy: cmdDeploy,
 };

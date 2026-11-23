@@ -322,6 +322,8 @@ export interface CardStatement {
   paid: number;
   toPay: number;
   status: "none" | "paid" | "due" | "late" | "partly" | "unpaid" | "open";
+  /** The bank's PDF is filed in the data repo (statement lists and detail only). */
+  pdf?: boolean;
 }
 
 export interface CashbackPeriod {

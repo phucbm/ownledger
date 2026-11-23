@@ -1,8 +1,9 @@
 import { execFileSync, spawn } from "node:child_process";
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { dirname, join, resolve } from "node:path";
+import { STATEMENT_PDF_RE, STATEMENTS_DIR } from "../modules/cards/files.js";
 import { readDataDir } from "../node/files.js";
 import { pkgPath } from "../node/scaffold.js";
 import { openwalletFlag } from "./deploy.js";
@@ -12,11 +13,17 @@ function opt(args: string[], name: string): string | undefined {
   return i >= 0 ? args[i + 1] : undefined;
 }
 
-/** data/ + imports/*.mapping.yaml, as the Worker would read them from GitHub. */
+/** data/ + imports/*.mapping.yaml, and statement PDFs by path only (""), as the Worker would read them from GitHub. */
 function localFiles(root: string): Record<string, string> {
   const files = readDataDir(root);
   const imp = join(root, "imports");
   if (existsSync(imp)) for (const f of readdirSync(imp)) if (f.endsWith(".mapping.yaml")) files[`imports/${f}`] = readFileSync(join(imp, f), "utf8");
+  const st = join(root, STATEMENTS_DIR);
+  if (existsSync(st))
+    for (const acc of readdirSync(st)) {
+      if (!statSync(join(st, acc)).isDirectory()) continue;
+      for (const f of readdirSync(join(st, acc))) if (STATEMENT_PDF_RE.test(`${STATEMENTS_DIR}/${acc}/${f}`)) files[`${STATEMENTS_DIR}/${acc}/${f}`] = "";
+    }
   return files;
 }
 
@@ -31,6 +38,16 @@ export function startDataServer(root: string, port: number) {
   const server = createServer((req, res) => {
     const files = localFiles(root);
     if (req.url === "/head") return res.end(headOf(files));
+    if (req.url?.startsWith("/blob?")) {
+      // statement PDFs only: the path must be one the listing above has
+      const path = new URL(req.url, "http://x").searchParams.get("path") ?? "";
+      if (!STATEMENT_PDF_RE.test(path) || files[path] === undefined) {
+        res.statusCode = 404;
+        return res.end();
+      }
+      res.setHeader("Content-Type", "application/pdf");
+      return res.end(readFileSync(join(root, path)));
+    }
     if (req.url === "/files") {
       res.setHeader("Content-Type", "application/json");
       return res.end(JSON.stringify(files));

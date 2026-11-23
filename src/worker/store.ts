@@ -1,13 +1,15 @@
 import { checkFiles } from "../engine/check.js";
 import type { FileMap } from "../engine/load.js";
 import type { Ledger } from "../engine/types.js";
-import { commit, filesAt, headSha, type CommitFile, type GitHubAppConfig } from "./github.js";
+import { blobAt, commit, filesAt, headSha, type CommitFile, type GitHubAppConfig } from "./github.js";
 import type { Env } from "./env.js";
 
 /** Where the data lives: the user's GitHub repo, or (in `ownledger dev`) the local folder. */
 export interface DataSource {
   head(): Promise<string>;
   files(sha: string): Promise<FileMap>;
+  /** One file's bytes at a commit (statement PDFs), streamed; null if missing. */
+  blob(sha: string, path: string): Promise<Response | null>;
   commit(baseSha: string, files: CommitFile[], message: string): Promise<string>;
   label: string;
 }
@@ -18,6 +20,7 @@ export function githubSource(env: Env): DataSource {
     label: `github.com/${c.repo}@${c.branch}`,
     head: () => headSha(c),
     files: (sha) => filesAt(c, sha),
+    blob: (sha, path) => blobAt(c, sha, path),
     commit: (base, files, message) => commit(c, base, files, message),
   };
 }
@@ -29,6 +32,10 @@ export function devSource(env: Env): DataSource {
     label: `local ${base}`,
     head: async () => (await (await fetch(`${base}/head`)).text()).trim(),
     files: async () => (await (await fetch(`${base}/files`)).json()) as FileMap,
+    blob: async (_sha, path) => {
+      const r = await fetch(`${base}/blob?path=${encodeURIComponent(path)}`);
+      return r.status === 404 ? null : r.ok ? r : Promise.reject(new Error(`dev blob: ${r.status}`));
+    },
     commit: async (baseSha, files, message) => {
       const r = await fetch(`${base}/commit`, { method: "POST", body: JSON.stringify({ baseSha, files, message }) });
       if (r.status === 409) {
@@ -56,7 +63,7 @@ export interface Snapshot {
 // Parsed ledgers live in the isolate's memory (keyed by commit); raw files also in KV, so a cold isolate
 // needs no GitHub tarball for a commit it has seen. Both are safe to drop: GitHub is the only store.
 const memory = new Map<string, Snapshot>();
-const KV_PREFIX = "ownledger:files:";
+const KV_PREFIX = "ownledger:files2:"; // 2: with statement PDF paths (plan 004)
 
 export async function snapshot(env: Env, src: DataSource, sha?: string): Promise<Snapshot> {
   const head = sha ?? (await src.head());

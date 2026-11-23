@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.1.0 (2026-11-23)
+
+Bank statements, optional. Data format stays 1: a repo without statements works as it does now.
+
+- **Convention:** the bank's statement PDFs, unlocked, at `imports/statements/<account-id>/<YYYY-MM>.pdf` (`YYYY-MM` =
+  the month of the statement's close date); optional `imports/statements/sources.yaml` (how to find each card's
+  statements in email: sender, subject, the name of the password variable and what the password is made of). Passwords
+  stay in `.env.statements` on your computer (git-ignored).
+- **CLI:** `ownledger statements add <card> <file.pdf>…` unlocks (qpdf compiled to WebAssembly, nothing to install),
+  reads the statement period from the PDF's text (or asks for `--month`), skips what's already filed, refuses a
+  different file for a filed month, and commits once per run (preview; `--yes`). `ownledger statements list` shows the
+  months each card has and the ones missing. `ownledger statements check <card> <YYYY-MM>` prints the statement's text
+  next to ownledger's figures and transactions for that period, for your agent to compare. `ownledger check` warns on
+  statement files that don't fit (unknown account folder, bad name, still locked).
+- **Dashboard:** a filed statement shows a "Statement PDF" link (`GET /api/m/cards/statement-pdf?account=&close=`,
+  same sign-in, built from the ledger's own card and close date). Card statements in `/api/m/cards/<id>` and
+  `…/statement` carry `pdf: true` when the file exists.
+- **Statements are read on your computer only.** The Worker lists the PDFs' paths (their bytes are skipped in the
+  tarball) and streams one to your signed-in dashboard; it never parses them. No connector tool reads statements.
+- **AGENTS.md:** "Bank statements": collect from Gmail with your own agent, file, check against the ledger.
+
 ## 2.0.0 (2026-11-22)
 
 A new dashboard, modules, and credit cards done properly. Data format stays 1: existing data repos work as they are.

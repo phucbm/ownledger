@@ -13,7 +13,8 @@ export interface ModuleApiCtx {
   q: URLSearchParams;
 }
 
-export type ModuleApiResult = { body: unknown; status?: number } | null;
+/** JSON (`body`), or a ready response (e.g. a PDF). */
+export type ModuleApiResult = { body: unknown; status?: number } | { response: Response } | null;
 type Handler = (path: string, c: ModuleApiCtx) => Promise<ModuleApiResult> | ModuleApiResult;
 
 /** /api/m/<module>/… : each module's endpoints. A module that's off answers 404. */

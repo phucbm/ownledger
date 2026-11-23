@@ -2,6 +2,8 @@
  * The Worker's only network peer: GitHub's API, through the user's own GitHub App.
  * Installation tokens are short-lived and limited to the one data repo.
  */
+import { STATEMENT_PDF_RE } from "../modules/cards/files.js";
+
 const API = "https://api.github.com";
 const UA = "ownledger-worker";
 
@@ -96,13 +98,26 @@ export async function headSha(c: GitHubAppConfig): Promise<string> {
   return (await res.text()).trim();
 }
 
-/** Every file under data/ and imports/*.mapping.yaml at a commit, from one tarball. */
+/** Every file under data/ and imports/*.mapping.yaml at a commit, from one tarball; statement PDFs by path only (""). */
 export async function filesAt(c: GitHubAppConfig, sha: string): Promise<Record<string, string>> {
   const token = await installationToken(c);
   const res = await gh(`/repos/${c.repo}/tarball/${sha}`, token);
   if (!res.ok || !res.body) throw new Error(`GitHub tarball: ${res.status}`);
   const { untar } = await import("./tar.js");
-  return untar(res.body.pipeThrough(new DecompressionStream("gzip")), (p) => p.startsWith("data/") || /^imports\/[^/]+\.mapping\.yaml$/.test(p));
+  return untar(
+    res.body.pipeThrough(new DecompressionStream("gzip")),
+    (p) => p.startsWith("data/") || /^imports\/[^/]+\.mapping\.yaml$/.test(p),
+    (p) => STATEMENT_PDF_RE.test(p),
+  );
+}
+
+/** One file's bytes at a commit, streamed (null when it isn't there). */
+export async function blobAt(c: GitHubAppConfig, sha: string, path: string): Promise<Response | null> {
+  const token = await installationToken(c);
+  const res = await gh(`/repos/${c.repo}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${encodeURIComponent(sha)}`, token, { headers: { Accept: "application/vnd.github.raw" } });
+  if (res.status === 404) return null;
+  if (!res.ok || !res.body) throw new Error(`GitHub file: ${res.status}`);
+  return res;
 }
 
 export interface CommitFile {

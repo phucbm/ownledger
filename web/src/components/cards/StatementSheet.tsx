@@ -21,7 +21,22 @@ export function StatementSheet({ account, close, onClose }: { account: string; c
       <SheetContent side={phone ? "bottom" : "right"} className={phone ? "max-h-[85svh] overflow-auto rounded-t-xl" : "overflow-auto sm:max-w-md"}>
         <SheetHeader>
           <SheetTitle>{s?.open ? t("cards.currentPeriod") : t("cards.statementOf", { date: close ? formatDate(close, lang) : "" })}</SheetTitle>
-          <SheetDescription>{s ? `${formatDate(s.from, lang)} – ${formatDate(s.close, lang)}` : t("common.loading")}</SheetDescription>
+          <SheetDescription>
+            {s ? `${formatDate(s.from, lang)} – ${formatDate(s.close, lang)}` : t("common.loading")}
+            {s?.pdf && (
+              <>
+                {" · "}
+                <a
+                  href={`/api/m/cards/statement-pdf?account=${encodeURIComponent(account)}&close=${s.close}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline underline-offset-2 hover:text-foreground"
+                >
+                  {t("cards.statementPdf")}
+                </a>
+              </>
+            )}
+          </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-3 px-4 pb-4">
           {error ? (

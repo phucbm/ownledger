@@ -19,13 +19,14 @@ const base: FileMap = {
   "data/dashboards/someone-else.yaml": "version: 1\nwidgets:\n  - { id: x, type: pace, x: 0, y: 0, w: 6, h: 4 }\n",
 };
 
-function world(files: FileMap = { ...base }) {
+function world(files: FileMap = { ...base }, blobs: Record<string, Uint8Array> = {}, envOver: Partial<Env> = {}) {
   const state = { files: { ...files }, commits: [] as { message: string; paths: string[] }[] };
   const sha = () => createHash("sha1").update(JSON.stringify(Object.entries(state.files).sort())).digest("hex");
   const src: DataSource = {
     label: "memory",
     head: async () => sha(),
     files: async () => ({ ...state.files }),
+    blob: async (_sha, path) => (blobs[path] ? new Response(blobs[path]) : null),
     commit: async (baseSha, changed, message) => {
       if (baseSha !== sha()) throw new Error("moved");
       for (const f of changed) state.files[f.path] = f.content ?? "";
@@ -44,6 +45,7 @@ function world(files: FileMap = { ...base }) {
     DEV_LOGIN: "phuc",
     ALLOWED_LOGINS: "phuc",
     TIMEZONE: "Asia/Ho_Chi_Minh",
+    ...envOver,
   } as unknown as Env;
   let id = 0;
   const call = async (name: string, args: Record<string, unknown> = {}) => {
@@ -60,7 +62,8 @@ function world(files: FileMap = { ...base }) {
     const res = await api(new Request(`http://localhost/api/${path}`, { ...init, headers: { Origin: "http://localhost", "Content-Type": "application/json", ...(init.headers ?? {}) } }), env, src);
     return { status: res.status, body: (await res.json()) as Record<string, unknown> };
   };
-  return { state, call, http };
+  const raw = (path: string) => api(new Request(`http://localhost/api/${path}`), env, src);
+  return { state, call, http, raw };
 }
 
 describe("connector: AI-built widgets", () => {
@@ -151,5 +154,52 @@ describe("API", () => {
     expect((one.body.statements as unknown[]).length).toBeGreaterThan(0);
     const none = world({ ...base, "data/accounts.yaml": "- {id: cash, name: Cash, type: cash}\n- {id: momo, name: MoMo, type: ewallet}\n- {id: card, name: Card, type: other}\n" });
     expect((await none.http("m/cards")).status).toBe(404);
+  });
+});
+
+describe("statement PDFs (plan 004)", () => {
+  // made-up bytes; the Worker never parses them, it only streams them
+  const pdf = new TextEncoder().encode("%PDF-1.4 made-up statement");
+  const filed = { ...base, "imports/statements/card/2026-11.pdf": "" };
+  const blobs = { "imports/statements/card/2026-11.pdf": pdf };
+
+  it("streams a filed statement's PDF to the signed-in dashboard", async () => {
+    const w = world(filed, blobs);
+    const res = await w.raw("m/cards/statement-pdf?account=card&close=2026-11-05&date=2026-11-23");
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("application/pdf");
+    expect(res.headers.get("Content-Disposition")).toBe('inline; filename="card-2026-11.pdf"');
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(pdf);
+  });
+
+  it("marks statements that have a PDF", async () => {
+    const w = world(filed, blobs);
+    const one = await w.http("m/cards/card?date=2026-11-23");
+    const sts = one.body.statements as { close: string; pdf: boolean }[];
+    expect(sts.find((s) => s.close === "2026-11-05")?.pdf).toBe(true);
+    expect(sts.filter((s) => s.pdf)).toHaveLength(1);
+    const st = await w.http("m/cards/card/statement?close=2026-11-05&date=2026-11-23");
+    expect((st.body.statement as { pdf: boolean }).pdf).toBe(true);
+  });
+
+  it("refuses what isn't a filed PDF of a closed statement of a card", async () => {
+    const w = world(filed, blobs);
+    const st = async (q: string) => (await w.raw(`m/cards/statement-pdf?${q}&date=2026-11-23`)).status;
+    expect(await st("account=card&close=2026-10-05")).toBe(404); // a statement, no PDF filed
+    expect(await st("account=card&close=2026-11-23")).toBe(404); // the open period
+    expect(await st("account=card&close=2026-11-06")).toBe(404); // not a close date
+    expect(await st("account=cash&close=2026-11-05")).toBe(404); // not a card
+    expect(await st("account=../card&close=2026-11-05")).toBe(404);
+    expect(await st("account=card&close=../../x")).toBe(400);
+    expect(await st("account=card")).toBe(400);
+    // listed in the tree but the bytes are gone
+    expect((await world(filed, {}).raw("m/cards/statement-pdf?account=card&close=2026-11-05&date=2026-11-23")).status).toBe(404);
+  });
+
+  it("needs the same sign-in as every /api route", async () => {
+    const w = world(filed, blobs, { DEV_LOGIN: "", COOKIE_SECRET: "test-secret-test-secret-test-secret" } as Partial<Env>);
+    expect((await w.raw("m/cards/statement-pdf?account=card&close=2026-11-05&date=2026-11-23")).status).toBe(401);
   });
 });
