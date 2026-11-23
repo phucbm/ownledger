@@ -109,14 +109,20 @@ export async function api(req: Request, env: Env, source?: DataSource): Promise<
   const q = url.searchParams;
   const path = url.pathname.slice(5);
   const src = source ?? sourceFor(env);
-  const s = await snapshot(env, src);
+  let s: Awaited<ReturnType<typeof snapshot>>;
+  try {
+    s = await snapshot(env, src);
+  } catch (e) {
+    // Loading the data repo failed (GitHub down, app not installed…): say why, as JSON, instead of a bare 500.
+    return json({ error: `could not load the data repo (${src.label}): ${(e as Error).message}` }, 502);
+  }
   const L = s.ledger;
   const asOf = q.get("date") ?? todayIn(env.TIMEZONE || "Asia/Ho_Chi_Minh");
-  const dash = dashboardOf(s.files, login);
-  const pool = poolOf(L, dash?.prefs?.pool, asOf);
-  /** "pool" in an account filter means every account in the pool. */
-  const accountParam = (v: string | null): string | string[] | undefined => (!v ? undefined : v === "pool" ? pool.accounts : v.includes(",") ? v.split(",") : v);
   try {
+    const dash = dashboardOf(s.files, login);
+    const pool = poolOf(L, dash?.prefs?.pool, asOf);
+    /** "pool" in an account filter means every account in the pool. */
+    const accountParam = (v: string | null): string | string[] | undefined => (!v ? undefined : v === "pool" ? pool.accounts : v.includes(",") ? v.split(",") : v);
     if (path.startsWith("m/")) {
       const r = await moduleApi(path.slice(2), { req, env, src, snap: s, login, asOf, q });
       if (r && "response" in r) return r.response;

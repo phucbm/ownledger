@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.1 (2026-11-23)
+
+- **Fix: the dashboard failed to load ("Could not load data:" with no reason) once statement PDFs were filed.** The
+  Worker read each new commit from the repo's whole tarball, PDFs included, and ran past Cloudflare's CPU limit. It now
+  lists the repo's files (one call) and reads only `data/` and `imports/*.mapping.yaml` (one GraphQL call per 100
+  files); statement PDFs and raw exports are never downloaded. Same GitHub App permissions.
+- **Clear errors:** when the data repo can't be loaded, `/api/*` answers JSON with the reason (502) instead of a bare
+  500, and the dashboard shows the HTTP status when an answer isn't JSON (e.g. Cloudflare's own 503 page).
+
 ## 2.1.0 (2026-11-23)
 
 Bank statements, optional. Data format stays 1: a repo without statements works as it does now.

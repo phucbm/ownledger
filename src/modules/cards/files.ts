@@ -2,7 +2,7 @@ import type { FileMap } from "../../engine/load.js";
 
 /**
  * Bank statement PDFs (plan 004): imports/statements/<account-id>/<YYYY-MM>.pdf, YYYY-MM = the month of the close date.
- * The Worker only knows their paths (from the tarball, contents not read) and streams one to the signed-in dashboard;
+ * The Worker only knows their paths (from the file tree, contents never downloaded) and streams one to the signed-in dashboard;
  * it never parses them. Reading them is the CLI's job, on the user's computer.
  */
 export const STATEMENTS_DIR = "imports/statements";

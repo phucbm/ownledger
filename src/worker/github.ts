@@ -98,17 +98,64 @@ export async function headSha(c: GitHubAppConfig): Promise<string> {
   return (await res.text()).trim();
 }
 
-/** Every file under data/ and imports/*.mapping.yaml at a commit, from one tarball; statement PDFs by path only (""). */
+/** Files the Worker reads as text: everything under data/ and imports/*.mapping.yaml. */
+export const isDataFile = (p: string): boolean => p.startsWith("data/") || /^imports\/[^/]+\.mapping\.yaml$/.test(p);
+
+interface TreeEntry {
+  path: string;
+  type: string;
+  sha: string;
+}
+
+/** Which tree entries to read as text, and which to list by path only (statement PDFs, never downloaded). */
+export function pickFiles(tree: TreeEntry[]): { text: TreeEntry[]; pathOnly: string[] } {
+  const text: TreeEntry[] = [];
+  const pathOnly: string[] = [];
+  for (const e of tree) {
+    if (e.type !== "blob") continue;
+    if (isDataFile(e.path)) text.push(e);
+    else if (STATEMENT_PDF_RE.test(e.path)) pathOnly.push(e.path);
+  }
+  return { text, pathOnly };
+}
+
+const GRAPHQL_BATCH = 100;
+
+/**
+ * Every file under data/ and imports/*.mapping.yaml at a commit; statement PDFs by path only ("").
+ * One tree listing plus one GraphQL call per 100 files: no tarball, so binary files in the repo
+ * (statement PDFs, raw exports) cost the Worker nothing (a tarball of them ran past the Free plan's CPU limit).
+ */
 export async function filesAt(c: GitHubAppConfig, sha: string): Promise<Record<string, string>> {
   const token = await installationToken(c);
-  const res = await gh(`/repos/${c.repo}/tarball/${sha}`, token);
-  if (!res.ok || !res.body) throw new Error(`GitHub tarball: ${res.status}`);
-  const { untar } = await import("./tar.js");
-  return untar(
-    res.body.pipeThrough(new DecompressionStream("gzip")),
-    (p) => p.startsWith("data/") || /^imports\/[^/]+\.mapping\.yaml$/.test(p),
-    (p) => STATEMENT_PDF_RE.test(p),
-  );
+  const t = await ok<{ tree: TreeEntry[]; truncated: boolean }>(await gh(`/repos/${c.repo}/git/trees/${sha}?recursive=1`, token), "list the data repo's files");
+  if (t.truncated) throw new Error("GitHub file list: the data repo has too many files for one listing (over 100,000)");
+  const { text, pathOnly } = pickFiles(t.tree);
+  const out: Record<string, string> = {};
+  for (const p of pathOnly) out[p] = "";
+  const [owner, name] = c.repo.split("/");
+  for (let i = 0; i < text.length; i += GRAPHQL_BATCH) {
+    const batch = text.slice(i, i + GRAPHQL_BATCH);
+    const fields = batch.map((e, j) => `f${j}: object(oid: ${JSON.stringify(e.sha)}) { ... on Blob { text isTruncated } }`).join("\n");
+    const res = await gh(`/graphql`, token, {
+      method: "POST",
+      body: JSON.stringify({ query: `query($owner: String!, $name: String!) { repository(owner: $owner, name: $name) { ${fields} } }`, variables: { owner, name } }),
+    });
+    const j = await ok<{ data?: { repository: Record<string, { text: string | null; isTruncated: boolean } | null> }; errors?: { message: string }[] }>(res, "read the data files");
+    if (j.errors?.length || !j.data) throw new Error(`GitHub read the data files: ${j.errors?.map((e) => e.message).join("; ") ?? "no data"}`);
+    for (const [k, e] of batch.entries()) {
+      const b = j.data.repository[`f${k}`];
+      // Too big for GraphQL's text field: fetch that one file raw.
+      out[e.path] = b && b.text !== null && !b.isTruncated ? b.text : await blobText(c.repo, e, token);
+    }
+  }
+  return out;
+}
+
+async function blobText(repo: string, e: TreeEntry, token: string): Promise<string> {
+  const res = await gh(`/repos/${repo}/git/blobs/${e.sha}`, token, { headers: { Accept: "application/vnd.github.raw+json" } });
+  if (!res.ok) throw new Error(`GitHub file ${e.path}: ${res.status}`);
+  return res.text();
 }
 
 /** One file's bytes at a commit, streamed (null when it isn't there). */

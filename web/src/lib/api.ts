@@ -18,13 +18,15 @@ export async function api<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers: { accept: "application/json", ...(init.body ? { "content-type": "application/json" } : {}), ...init.headers },
   });
   if (!res.ok) {
-    let msg = res.statusText;
+    let msg = "";
     try {
       const j = (await res.json()) as { error?: string };
       if (j.error) msg = j.error;
     } catch {
-      /* not JSON */
+      /* not JSON: Cloudflare's own error page (e.g. the Worker ran out of CPU time) */
     }
+    // statusText is empty over HTTP/2, so never rely on it.
+    if (!msg) msg = res.status === 503 ? `HTTP 503: the server hit its limit (Cloudflare). Try again in a moment.` : `HTTP ${res.status}${res.statusText ? ` ${res.statusText}` : ""}`;
     throw new ApiError(res.status, msg);
   }
   return (await res.json()) as T;

@@ -61,7 +61,7 @@ export interface Snapshot {
 }
 
 // Parsed ledgers live in the isolate's memory (keyed by commit); raw files also in KV, so a cold isolate
-// needs no GitHub tarball for a commit it has seen. Both are safe to drop: GitHub is the only store.
+// needs no GitHub reads for a commit it has seen. Both are safe to drop: GitHub is the only store.
 const memory = new Map<string, Snapshot>();
 const KV_PREFIX = "ownledger:files2:"; // 2: with statement PDF paths (plan 004)
 
