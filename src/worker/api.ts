@@ -119,6 +119,7 @@ export async function api(req: Request, env: Env, source?: DataSource): Promise<
   try {
     if (path.startsWith("m/")) {
       const r = await moduleApi(path.slice(2), { req, env, src, snap: s, login, asOf, q });
+      if (r && "response" in r) return r.response;
       return r ? json(r.body, r.status ?? 200) : json({ error: "not found" }, 404);
     }
     switch (path) {

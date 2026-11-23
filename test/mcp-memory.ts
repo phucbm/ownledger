@@ -25,6 +25,7 @@ export async function connect(deps: Deps = { openwallet: null }) {
     label: "fixtures/demo",
     head: async () => "demo0000000000000000000000000000000000000",
     files: async () => files,
+    blob: async () => null,
     commit: async () => {
       throw new Error("evals never commit");
     },

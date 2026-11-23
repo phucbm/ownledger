@@ -4,13 +4,14 @@ import { join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { addDays } from "../engine/dates.js";
 import type { ISODate } from "../engine/types.js";
+import { STATEMENTS_DIR } from "../modules/cards/files.js";
 import { closeOnOrAfter, prevClose } from "../modules/cards/statements.js";
 
 /**
  * Bank statements (plan 004): imports/statements/<account-id>/<YYYY-MM>.pdf, unlocked.
  * Read on the user's computer only (CLI); the Worker never parses them.
  */
-export const STATEMENTS_DIR = "imports/statements";
+export { STATEMENTS_DIR };
 export const SOURCES_FILE = `${STATEMENTS_DIR}/sources.yaml`;
 export const ENV_FILE = ".env.statements";
 const MONTH_FILE = /^\d{4}-(0[1-9]|1[0-2])\.pdf$/;

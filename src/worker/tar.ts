@@ -1,5 +1,6 @@
 /** Minimal streaming tar reader (ustar + pax path headers), enough for GitHub's tarballs. */
-export async function untar(stream: ReadableStream<Uint8Array>, keep: (path: string) => boolean): Promise<Record<string, string>> {
+/** `keep`: files whose text is returned. `pathOnly`: files returned with "" (their bytes are skipped, never decoded). */
+export async function untar(stream: ReadableStream<Uint8Array>, keep: (path: string) => boolean, pathOnly?: (path: string) => boolean): Promise<Record<string, string>> {
   const out: Record<string, string> = {};
   const reader = stream.getReader();
   let buf = new Uint8Array(0);
@@ -50,6 +51,7 @@ export async function untar(stream: ReadableStream<Uint8Array>, keep: (path: str
     if (type !== "0" && type !== "\0") continue;
     const rel = full.slice(full.indexOf("/") + 1); // strip "<repo>-<sha>/"
     if (keep(rel)) out[rel] = dec.decode(body);
+    else if (pathOnly?.(rel)) out[rel] = "";
   }
   reader.cancel().catch(() => undefined);
   return out;
