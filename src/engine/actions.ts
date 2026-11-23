@@ -4,6 +4,7 @@ import { flattenCategories } from "./categories.js";
 import { isDate } from "./dates.js";
 import { LEDGER_FILE_RE, loadLedger, parseJsonl, PATHS, type FileMap } from "./load.js";
 import { applyChange, describeChange, yamlText, type Change } from "./write.js";
+import { STATEMENTS_FILE, withBankAmounts } from "../modules/cards/terms.js";
 import type { Account, CategoriesFile, CategoryNode, Issue, Line, Plan, Price, Transaction, TrailEntry } from "./types.js";
 
 /**
@@ -196,14 +197,16 @@ function buildVoid(files: FileMap, id: string, reason?: string, meta?: WriteMeta
 export type BatchOp =
   | ({ op: "add"; reason?: string } & SimpleTx)
   | ({ op: "edit"; id: string; reason?: string } & Partial<SimpleTx>)
-  | { op: "void"; id: string; reason?: string };
+  | { op: "void"; id: string; reason?: string }
+  /** The bank's amount for a card statement (data/cards/statements.yaml), like add_statement_amount. */
+  | { op: "statement_amount"; account: string; statement_date: string; amount: number; reason?: string };
 
 export const BATCH_MAX = 200;
 
 export interface BatchPlanned extends Planned {
   /** Change in each account's balance (base currency) over the whole batch. */
   balanceChange: Record<string, number>;
-  counts: { add: number; edit: number; void: number };
+  counts: { add: number; edit: number; void: number; statement_amount: number };
 }
 
 function joinReason(batch?: string, own?: string): string | undefined {
@@ -224,10 +227,19 @@ export function batch(files: FileMap, ops: BatchOp[], meta?: WriteMeta): BatchPl
   const changed = new Set<string>();
   const finals = new Map<string, Transaction>(); // id -> final version
   const originals = new Map<string, Transaction | null>(); // id -> version before the batch (null: added here)
-  const counts = { add: 0, edit: 0, void: 0 };
+  const counts = { add: 0, edit: 0, void: 0, statement_amount: 0 };
+  const amounts: { account: string; statement_date: string; amount: number }[] = [];
   ops.forEach((o, i) => {
     const m = meta ? { ...meta, reason: joinReason(meta.reason, o.reason) } : undefined;
     let b: Built;
+    if (o.op === "statement_amount") {
+      if (!isDate(o.statement_date) || !Number.isInteger(o.amount)) throw new ActionError(`batch refused: op ${i + 1} (statement_amount) needs statement_date yyyy-mm-dd and a whole amount`);
+      const k = amounts.findIndex((x) => x.account === o.account && x.statement_date === o.statement_date);
+      if (k >= 0) amounts.splice(k, 1);
+      amounts.push({ account: o.account, statement_date: o.statement_date, amount: o.amount });
+      counts.statement_amount++;
+      return;
+    }
     try {
       if (o.op === "add") {
         const { op: _op, reason: _r, ...t } = o;
@@ -248,6 +260,12 @@ export function batch(files: FileMap, ops: BatchOp[], meta?: WriteMeta): BatchPl
     for (const p of Object.keys(out)) changed.add(p);
     cur = { ...cur, ...out };
   });
+  if (amounts.length) {
+    const unknown = amounts.find((x) => !loadLedger(cur).ledger.accounts.some((a) => a.id === x.account));
+    if (unknown) throw new ActionError(`batch refused: statement_amount: no account ${unknown.account}`);
+    cur = { ...cur, [STATEMENTS_FILE]: yamlText(withBankAmounts(loadLedger(cur).ledger, amounts)) };
+    changed.add(STATEMENTS_FILE);
+  }
   const r = checkFiles(cur);
   if (!r.ok) throw new ActionError(`batch refused, the result would not pass check:\n${r.errors.slice(0, 10).map((e) => `- ${e.where ? `[${e.where}] ` : ""}${e.message}`).join("\n")}`);
   const before = new Set(checkFiles(files).warnings.map((w) => `${w.file}|${w.where}|${w.message}`));
@@ -267,12 +285,12 @@ export function batch(files: FileMap, ops: BatchOp[], meta?: WriteMeta): BatchPl
     bump(old, -1);
   }
   for (const [k, v] of Object.entries(balanceChange)) if (v === 0) delete balanceChange[k];
-  const parts = [counts.add && `${counts.add} add${counts.add > 1 ? "s" : ""}`, counts.edit && `${counts.edit} edit${counts.edit > 1 ? "s" : ""}`, counts.void && `${counts.void} void${counts.void > 1 ? "s" : ""}`].filter(Boolean);
+  const parts = [counts.add && `${counts.add} add${counts.add > 1 ? "s" : ""}`, counts.edit && `${counts.edit} edit${counts.edit > 1 ? "s" : ""}`, counts.void && `${counts.void} void${counts.void > 1 ? "s" : ""}`, counts.statement_amount && `${counts.statement_amount} bank amount${counts.statement_amount > 1 ? "s" : ""}`].filter(Boolean);
   const change: Change = { ...(add.length ? { addTransactions: add } : {}), ...(rep.length ? { replaceTransactions: rep } : {}) };
   return {
     change,
     files: out,
-    summary: [`batch: ${parts.join(", ")}`, ...describeChange(change)],
+    summary: [`batch: ${parts.join(", ")}`, ...describeChange(change), ...amounts.map((x) => `bank amount ${x.account} ${x.statement_date}: ${x.amount}`)],
     message: withMeta(`Batch: ${parts.join(", ")}`, meta),
     warnings: r.warnings.filter((w) => !before.has(`${w.file}|${w.where}|${w.message}`)),
     balanceChange,

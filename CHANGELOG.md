@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.0 (2026-11-23)
+
+- **`batch` saves bank statement amounts too:** op `statement_amount` (`account`, `statement_date`, `amount`; 0
+  allowed), the same as `add_statement_amount`, so a whole statement check (the transaction fixes and every month's bank
+  figure) is one preview and one commit. For banks whose PDFs print the closing figure without a label.
+
 ## 2.2.0 (2026-11-23)
 
 Batch writes, and checking every statement of a card in one run (plan 005). Data format stays 1.

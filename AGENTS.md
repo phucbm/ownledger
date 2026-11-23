@@ -126,7 +126,9 @@ Propose the fixes to the owner as **one batch** (the connector's `batch` tool: o
 cover a gap**: find the real rows. If the closing figure isn't found or rows look wrong, add the layout fields to
 `sources.yaml` (above) rather than working around it. `--save-bank-amounts` saves each month's bank figure in
 `data/cards/statements.yaml` (preview; `--yes` after the owner's go) so `cards` / `card_statement` show the gap
-without the PDFs.
+without the PDFs. When a bank prints its closing figure without a label (reconcile says "no closing figure found"),
+read the figures off the PDFs and save them as `statement_amount` ops in the same `batch` (`account`,
+`statement_date` = the close date, `amount`); reconcile then compares those months too.
 
 `npx ownledger statements check <account-id> <YYYY-MM>` shows one statement: ownledger's figures and transactions for
 the period, the rows read from the PDF, and its text with columns kept.

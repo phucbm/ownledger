@@ -103,7 +103,7 @@ describe("actions", () => {
       { op: "edit", id: oldId, amount: 60000, date: "2026-11-01" },
       { op: "void", id: dupId, reason: "duplicate" },
     ], m);
-    expect(b.counts).toEqual({ add: 2, edit: 1, void: 1 });
+    expect(b.counts).toEqual({ add: 2, edit: 1, void: 1, statement_amount: 0 });
     expect(b.message).toBe("Batch: 2 adds, 1 edit, 1 void\n\nReason: Woori statement check\nVia: mcp (Claude)");
     expect(Object.keys(b.files).sort()).toEqual(["data/ledger/2026/10.jsonl", "data/ledger/2026/11.jsonl"]);
     expect(b.balanceChange).toEqual({ "card-visa": -10000, cash: -60000 + 50000 + 70000 });
