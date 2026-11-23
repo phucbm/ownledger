@@ -244,7 +244,7 @@ async function check(root: string, args: string[]): Promise<number> {
   try {
     const lines = await pdfLines(new Uint8Array(readFileSync(join(root, rel))));
     text = linesText(lines);
-    if (stmt) parsed = parseStatement(lines, stmt, readSources(root)[account]);
+    if (stmt) parsed = parseStatement(lines, stmt, readSources(root)[account], l.meta.base);
   } catch (e) {
     console.error(`${rel}: can't read the PDF's text (${e instanceof Error ? e.message : e}). Is it still locked? File it with \`ownledger statements add\`.`);
     return 1;
@@ -307,7 +307,7 @@ async function reconcileCmd(root: string, args: string[]): Promise<number> {
     const p = periods.get(f.month);
     try {
       const lines = await pdfLines(new Uint8Array(readFileSync(join(root, f.path))));
-      const parsed = p ? parseStatement(lines, p, layout) : { rows: [], closing: null };
+      const parsed = p ? parseStatement(lines, p, layout, l.meta.base) : { rows: [], closing: null };
       filed.push({ month: f.month, path: f.path, rows: parsed.rows, closing: parsed.closing });
     } catch (e) {
       filed.push({ month: f.month, path: f.path, rows: [], closing: null, error: `can't read the PDF (${e instanceof Error ? e.message : e}); still locked? file it with \`ownledger statements add\`` });

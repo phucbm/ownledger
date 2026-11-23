@@ -87,7 +87,12 @@ describe("statement rows: general rules", () => {
     expect(amountOf("(50,000)")).toEqual({ value: 50000, sign: -1 });
     expect(amountOf("50,000 CR")).toEqual({ value: 50000, sign: -1 });
     expect(amountOf("-50,000")).toEqual({ value: 50000, sign: -1 });
-    expect(amountOf("50,000 VND")).toEqual({ value: 50000, sign: 0 });
+    expect(amountOf("50,000 VND")).toEqual({ value: 50000, sign: 0, currency: "VND" });
+    expect(amountOf("VND 3,000,000")).toEqual({ value: 3000000, sign: 0, currency: "VND" });
+    expect(amountOf("50.000đ")).toEqual({ value: 50000, sign: 0, currency: "VND" });
+    expect(amountOf("USD 10.00")).toEqual({ value: 10, sign: 0, currency: "USD" });
+    expect(amountOf("CR 399,000.00")).toEqual({ value: 399000, sign: -1 });
+    expect(amountOf("3,483,958 (VND)")).toEqual({ value: 3483958, sign: 0, currency: "VND" });
     expect(amountOf("GRAB 50,000")).toBeNull();
     expect(amountOf("(50,000")).toBeNull();
   });
@@ -118,6 +123,40 @@ describe("statement rows: general rules", () => {
       ["2026-10-06", -250000, ""],
       ["2026-10-07", 25000, "word"],
     ]);
+  });
+  it("a layout with the amount first (amount_column: 1), a points column last, VND-prefixed figures; foreign amounts are skipped", () => {
+    const lines = linesFromText([
+      "Current Points  278,591  Payable amount / Số tiền thanh toán  VND 4,211,082",
+      "2025.08.03  2025.08.06  SHOP A  VND 33,300  0  33,300  1,665",
+      "2025.08.05  2025.08.07  SHOP ABROAD  USD 10.00  0  262,000  13,100",
+      "2025.08.27  2025.08.29  Sms Service Monthly Fee(VAT)  VND 909  0  909",
+      "2025.08.21  2025.08.21  Payment(Virtual Account)  VND 5,379,500  0",
+      "Projected Interest-2025.09.25  0",
+    ].join("\n"));
+    const p = parseStatement(lines, { from: "2025-08-01", close: "2025-08-31" }, { amount_column: 1 }, "VND");
+    expect(p.closing).toBe(4211082);
+    expect(p.rows.map((r) => [r.date, r.amount])).toEqual([["2025-08-03", -33300], ["2025-08-05", 0 - 262000], ["2025-08-27", -909], ["2025-08-21", 5379500]]);
+  });
+  it("a description wrapped onto the lines around the row; CR before the amount; the currency column is not the description", () => {
+    const lines = linesFromText([
+      "Retail VNM Q PHU NHUAN",
+      "21/06/25  24/06/25  -722,520.00  VND  722,520.00",
+      "MPOS*HARU SUSHI",
+      "22/06/25  24/06/25  Retail Foody  -34,000.00  VND  34,000.00",
+      "04/07/25  04/07/25  Nộp tiền vào tài khoản thẻ  399,000.00  VND  CR 399,000.00",
+    ].join("\n"));
+    const p = parseStatement(lines, { from: "2025-06-21", close: "2025-07-20" }, {}, "VND");
+    expect(p.rows.map((r) => [r.date, r.amount, r.description])).toEqual([
+      ["2025-06-21", -722520, "Retail VNM Q PHU NHUAN MPOS*HARU SUSHI"],
+      ["2025-06-22", -34000, "Retail Foody"],
+      ["2025-07-04", 399000, "Nộp tiền vào tài khoản thẻ"],
+    ]);
+  });
+  it("closing figure: a label with the figure on its line, never the minimum payment below it", () => {
+    const lines = linesFromText("Dư nợ cuối kỳ  3,483,958 (VND)\nStatement balance\nThanh toán tối thiểu\n174,198 (VND)\n");
+    expect(parseStatement(lines, { from: "2025-09-06", close: "2025-10-05" }, {}, "VND").closing).toBe(3483958);
+    const below = linesFromText("Statement balance\nThanh toán tối thiểu\n174,198 (VND)\n");
+    expect(parseStatement(below, { from: "2025-09-06", close: "2025-10-05" }, {}, "VND").closing).toBeNull();
   });
   it("sources.yaml fields: closing_label, credit_words, skip_words", () => {
     const lines = linesFromText("Số tiền cần trả  500.000\n03/10/2026  NẠP TIỀN  200.000\n04/10/2026  PHÍ DỊCH VỤ ẨN  9.000\n");
@@ -174,6 +213,14 @@ describe("reconcile", () => {
     expect(m["2026-11"]!.diff).toBe(-85000 + 180000 + 45000 + 85000 - 120000);
   });
 
+  it("joins a purchase with its DCC fee and VAT booked as one ledger row", () => {
+    const l = checkFiles({ ...files, "data/ledger/2026/09.jsonl": tx("d1", "2026-09-08", "Hosting", -258151, { category: "shop" }) + "\n", "data/ledger/2026/10.jsonl": "", "data/ledger/2026/11.jsonl": "" }).ledger;
+    const rows = [{ date: "2026-09-08", amount: -255343, description: "HOSTING", line: 1 }, { date: "2026-09-08", amount: -2553, description: "DCC FEE", line: 2 }, { date: "2026-09-08", amount: -255, description: "DCC VAT", line: 3 }];
+    const r = reconcile(l, "card-x", [{ month: "2026-09", path: "x.pdf", rows, closing: 258151 }], "2026-11-23");
+    expect(r.missing).toEqual([]);
+    expect(r.joined[0]!.statement).toHaveLength(3);
+    expect(r.months[0]!.diff).toBe(0);
+  });
   it("a filed month the ledger has no period for is listed with the reason; the saved bank figure is used when the PDF has none", async () => {
     const f = await filed();
     f[1] = { ...f[1]!, closing: null };

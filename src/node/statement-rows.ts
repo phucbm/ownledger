@@ -25,7 +25,7 @@ export interface StatementLayout {
   credit_words?: string[];
   /** Lines with these words are never rows (headers, totals). */
   skip_words?: string[];
-  /** Which amount on a row is the row's amount when there are several: 1 = first, -1 = last (default). */
+  /** Which amount on a row is the row's amount when there are several (zeros and other currencies not counted): 1 = first, -1 = last (default). */
   amount_column?: number;
 }
 
@@ -102,8 +102,8 @@ export function plain(s: string): string {
 }
 
 export const DEFAULT_CLOSING_LABELS = [
-  "payable amount", "total amount due", "total payment due", "new balance", "closing balance", "amount due", "statement balance",
-  "tong so tien phai thanh toan", "so tien phai thanh toan", "tong du no cuoi ky", "du no cuoi ky", "so du cuoi ky", "tong du no",
+  "tong so tien phai thanh toan", "so tien phai thanh toan", "tong du no cuoi ky", "du no cuoi ky", "so du cuoi ky",
+  "payable amount", "total amount due", "total payment due", "new balance", "closing balance", "statement balance", "amount due",
 ];
 export const DEFAULT_CREDIT_WORDS = ["payment", "refund", "cashback", "cash back", "reversal", "hoan tien", "hoan tra", "thanh toan the", "thanh toan du no", "tra no"];
 export const DEFAULT_SKIP_WORDS = [
@@ -137,21 +137,34 @@ export function datesOf(text: string, near: ISODate): ISODate[] {
 export interface Amount {
   value: number; // whole units, always positive
   sign: -1 | 1 | 0; // -1: written as a credit (CR, minus, brackets); 1: DR or plus; 0: no mark
+  currency?: string; // when written ("VND 33,300", "10.00 USD", "50.000đ")
 }
 
-const AMOUNT_RE = /^(\(?)\s*([-+]?)\s*(\d{1,3}(?:[.,\s]\d{3})+|\d{1,9})(?:([.,])(\d{1,2}))?\s*(\)?)\s*(cr|dr|vnd|vnđ|đ|₫)?\s*([-+]?)$/i;
+const AMOUNT_RE = /^(?:([A-Za-z]{2,3})\s+)?(\(?)\s*([-+]?)\s*(\d{1,3}(?:[.,\s]\d{3})+|\d{1,9})(?:([.,])(\d{1,2}))?\s*(\)?)\s*(?:(cr|dr|[A-Za-z]{3}|vnđ|đ|₫)|\((vnđ|[A-Za-z]{3})\))?\s*([-+]?)$/i;
 
-/** A cell that is an amount ("1,234,567", "1.234.567", "909", "-50,000", "(50,000)", "50,000 CR", "1,234.00"); else null. */
+/** A cell that is an amount ("1,234,567", "1.234.567", "909", "-50,000", "(50,000)", "50,000 CR", "CR 50,000", "1,234.00", "VND 33,300", "3,483,958 (VND)"); else null. */
 export function amountOf(text: string): Amount | null {
   const m = AMOUNT_RE.exec(text.trim());
   if (!m) return null;
-  const [, open, pre, int, , dec, close, unit, post] = m;
+  const [, before, open, pre, int, , dec, close, unit1, unit2, post] = m;
   if ((open && !close) || (!open && close)) return null;
   const value = Math.round(Number(int!.replace(/[.,\s]/g, "") + (dec ? "." + dec : "")));
-  const u = unit?.toLowerCase();
-  const sign: Amount["sign"] = open || pre === "-" || post === "-" || u === "cr" ? -1 : pre === "+" || post === "+" || u === "dr" ? 1 : 0;
-  return { value, sign };
+  const b = before?.toLowerCase();
+  const u = (unit1 ?? unit2)?.toLowerCase();
+  const mark = b === "cr" || b === "dr" ? b : u === "cr" || u === "dr" ? u : undefined;
+  const curB = b && b !== "cr" && b !== "dr" ? b : undefined;
+  if (b && !curB && !mark) return null;
+  if (curB && curB.length !== 3) return null;
+  const curU = u && u !== "cr" && u !== "dr" ? u : undefined;
+  if (curB && curU) return null; // two currencies
+  const sign: Amount["sign"] = open || pre === "-" || post === "-" || mark === "cr" ? -1 : pre === "+" || post === "+" || mark === "dr" ? 1 : 0;
+  const cur = curB ?? curU;
+  const currency = cur === "đ" || cur === "₫" || cur === "vnđ" ? "VND" : cur?.toUpperCase();
+  return { value, sign, ...(currency ? { currency } : {}) };
 }
+
+/** A cell that starts with a date. */
+const STARTS_WITH_DATE = /^(\d{1,2}[/.-]\d{1,2}([/.-](\d{4}|\d{2}))?|\d{4}[/.-]\d{1,2}[/.-]\d{1,2})(?![\d])/;
 
 const hasWord = (text: string, words: string[]) => {
   const p = plain(text);
@@ -200,7 +213,9 @@ function offset(c: Cell, h: Cell): number {
  * Rows and the closing figure of one statement. `period`: the statement period the ledger has for it
  * (rows dated far outside are header dates, not rows).
  */
-export function parseStatement(lines: Line[], period: { from: ISODate; close: ISODate }, layout: StatementLayout = {}): ParsedStatement {
+export function parseStatement(lines: Line[], period: { from: ISODate; close: ISODate }, layout: StatementLayout = {}, base?: string): ParsedStatement {
+  /** Amounts in another currency than the ledger's are the original amounts of foreign purchases: not the billed amount. */
+  const billed = (a: Amount | null): a is Amount => a !== null && (!a.currency || !base || a.currency === base.toUpperCase());
   const labels = (layout.closing_label ? [layout.closing_label].flat() : DEFAULT_CLOSING_LABELS).map(plain);
   const credits = layout.credit_words ?? DEFAULT_CREDIT_WORDS;
   const skips = [...DEFAULT_SKIP_WORDS, ...(layout.skip_words ?? []), ...labels];
@@ -220,7 +235,13 @@ export function parseStatement(lines: Line[], period: { from: ISODate; close: IS
       // the label's own cell may end with the amount ("Payable amount: 1,234,000")
       const tail = plain(l[at]!.text).split(label)[1]?.replace(/^[\s:]+/, "") ?? "";
       const own = tail ? amountOf(l[at]!.text.slice(l[at]!.text.length - tail.length)) : null;
-      const found = own ?? [...l.slice(at + 1), ...(lines[i + 1] ?? []), ...(lines[i + 2] ?? [])].map((c) => amountOf(c.text)).find((a) => a !== null) ?? null;
+      // the next lines count only up to a minimum-payment line (its figure is not the closing one)
+      const after: Cell[] = [...l.slice(at + 1)];
+      for (const n of [lines[i + 1], lines[i + 2]]) {
+        if (!n || /minimum|toi thieu/.test(plain(n.map((c) => c.text).join(" ")))) break;
+        after.push(...n);
+      }
+      const found = (billed(own) ? own : null) ?? after.map((c) => amountOf(c.text)).find(billed) ?? null;
       if (found) {
         closing = found.sign === -1 ? -found.value : found.value;
         closingLabel = label;
@@ -230,10 +251,12 @@ export function parseStatement(lines: Line[], period: { from: ISODate; close: IS
   }
 
   const rows: StatementRow[] = [];
+  const isCurrency = (t: string) => /^[A-Z]{3}$/.test(t.trim());
+  const dated = (l: Line | undefined) => !!l && l.slice(0, 2).some((c) => STARTS_WITH_DATE.test(c.text));
   lines.forEach((l, i) => {
     if (l.length < 2) return;
     // a row starts with a date in its first two cells
-    const head = l.slice(0, 2).flatMap((c) => datesOf(c.text, period.close));
+    const head = l.slice(0, 2).filter((c) => STARTS_WITH_DATE.test(c.text)).flatMap((c) => datesOf(c.text, period.close));
     const date = head[0];
     if (!date || date < lo || date > hi) return;
     const text = l.map((c) => c.text).join(" ");
@@ -244,10 +267,19 @@ export function parseStatement(lines: Line[], period: { from: ISODate; close: IS
       const stripped = c.text.replace(DATE_RE, "").trim();
       if (!stripped) continue; // a date cell
       const a = amountOf(c.text);
-      if (a) amounts.push({ cell: c, a });
-      else desc.push(stripped);
+      if (billed(a)) {
+        if (a.value) amounts.push({ cell: c, a }); // a 0 is an empty column (no discount), not the row's amount
+      } else if (!a && !isCurrency(stripped)) desc.push(stripped);
     }
-    if (!amounts.length || !desc.length) return;
+    if (!amounts.length) return;
+    // no description on the row itself: the bank wrapped it onto the lines around it (lines with no date and no amount)
+    if (!desc.length) {
+      for (const n of [lines[i - 1], lines[i + 1]]) {
+        if (!n || dated(n) || n.some((c) => amountOf(c.text))) continue;
+        const t = n.map((c) => c.text).join(" ");
+        if (!hasWord(t, skips)) desc.push(t);
+      }
+    }
     const pick = amounts[col < 0 ? amounts.length + col : col - 1] ?? amounts[amounts.length - 1]!;
     if (!pick.a.value) return;
     const description = desc.join(" ");

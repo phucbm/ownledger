@@ -1,6 +1,6 @@
 # 005: Batch writes, and checking every statement of a card in one run
 
-Written: 2026-11-23. Status: Approved 2026-11-23
+Written: 2026-11-23. Status: In progress
 Related: plan 004 (statement PDFs, `ownledger statements check`), plan 002 (card statements, bank's amount)
 
 ## Goal
@@ -66,3 +66,21 @@ Statement text is read only on the user's computer; the Worker still talks only 
 - Reading statements in the Worker or from claude.ai (see Decisions).
 - Batch for account, plan and card-term writes (the engine is ready for it; add the ops when needed).
 - Fixing things automatically: reconcile only reports; the owner still says go.
+
+## Progress (run 2026-11-23)
+
+- Steps 1–4 done: engine `batch()` (ops on the evolving files, check once, one message, balance change per account), MCP `batch` tool + `POST /api/batch` + `/api/batch/apply`, smoke-mcp batch (3 adds, then one batch voiding them), layout-keeping extraction (`src/node/statement-rows.ts`), `statements reconcile` (`src/node/reconcile.ts`), tests with generated bank-like PDFs.
+- Step 5: AGENTS.md, README, CHANGELOG, connector instructions; release 2.2.0.
+- Step 6 on the owner's repo (read only; nothing committed there):
+  - `woori-gold` (needs `amount_column: 1` in `sources.yaml`: the transaction amount comes first, the last column is points): 116 rows matched, 17 fee+VAT pairs joined. The only gaps are the three known ones: 2025-05 (+10,000, timing), 2026-04 (+500,000, timing), the 29,821 credit (2026-09/10). One ledger row on no statement: the 2026-01-06 payment of 1,244,648 from cash. The 2026-01 PDF filed for woori-gold is for another card (Visa Gold ****1435, not the Platinum ****1926 of the other months) and has no rows.
+  - `kbank`: the closing figures read, gaps are real (mostly DCC VAT and FX markup VAT rows not on the ledger). Fixes prepared for the owner as one batch (needs categories and the owner's go).
+  - `msb-mdigi`: rows read (CR before the amount, descriptions wrapped onto the lines around the row); MSB prints its closing figures without text labels, so no closing figure is found. Use `add_statement_amount` or a later layout field.
+
+## Decisions made during the run
+
+- **Timing is computed, not guessed:** per month, the part of the gap from matched rows that the bank and the ledger put on different sides of a close date ("of which timing"). A month is "timing only" when that explains the whole gap.
+- **Default credit words leave out plain "thanh toán":** on Vietnamese statements "Thanh toán …" often marks a purchase. Defaults: payment, refund, cashback, reversal, hoàn tiền, hoàn trả, thanh toán thẻ, thanh toán dư nợ, trả nợ.
+- **"tổng dư nợ" is not a default closing label:** on MSB it is the total debit of the period.
+- Joins take 2 or 3 same-day rows (KBank: purchase + DCC fee + DCC VAT booked as one row).
+- `amount_column` counts only non-zero amounts in the base currency (zero discount columns and foreign original amounts skipped). Added to the `sources.yaml` layout fields.
+- `withBankAmounts()` (cards module) is shared by `add_statement_amount` and `--save-bank-amounts`.

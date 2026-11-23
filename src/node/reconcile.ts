@@ -135,33 +135,36 @@ export function reconcile(l: Ledger, account: string, filed: FiledStatement[], a
     matched++;
   }
 
-  // 2. two rows on one side that add up to one on the other (fee + VAT on the same day)
+  // 2. two or three rows on one side that add up to one on the other (a fee and its VAT; a purchase with its DCC fee and VAT)
   const joined: ReconcileResult["joined"] = [];
   const openS = () => srows.filter((s) => !s.done);
   const openL = () => lrows.filter((r) => !r.done);
-  for (const r of openL()) {
-    const os = openS();
-    found: for (let i = 0; i < os.length; i++)
-      for (let j = i + 1; j < os.length; j++) {
-        const a = os[i]!, b = os[j]!;
-        if (a.date !== b.date || a.amount + b.amount !== r.amount || dist(a.date, r.date) > DAYS) continue;
-        a.done = b.done = r.done = true;
-        kept.push({ s: [a, b], r: [r] });
-        joined.push({ statement: [ref(a), ref(b)], ledger: [plainL(r)] });
-        break found;
+  /** Sets of 2–3 rows on the same date that sum to `amount`. */
+  function sumOf<T extends { date: ISODate; amount: number; done: boolean }>(pool: T[], amount: number, near: ISODate): T[] | null {
+    const c = pool.filter((x) => !x.done && dist(x.date, near) <= DAYS);
+    for (let i = 0; i < c.length; i++)
+      for (let j = i + 1; j < c.length; j++) {
+        if (c[i]!.date !== c[j]!.date) continue;
+        if (c[i]!.amount + c[j]!.amount === amount) return [c[i]!, c[j]!];
+        for (let k = j + 1; k < c.length; k++) if (c[k]!.date === c[i]!.date && c[i]!.amount + c[j]!.amount + c[k]!.amount === amount) return [c[i]!, c[j]!, c[k]!];
       }
+    return null;
+  }
+  for (const r of openL()) {
+    const set = sumOf(srows, r.amount, r.date);
+    if (!set) continue;
+    for (const x of set) x.done = true;
+    r.done = true;
+    kept.push({ s: set, r: [r] });
+    joined.push({ statement: set.map(ref), ledger: [plainL(r)] });
   }
   for (const s of openS()) {
-    const ol = openL();
-    found: for (let i = 0; i < ol.length; i++)
-      for (let j = i + 1; j < ol.length; j++) {
-        const a = ol[i]!, b = ol[j]!;
-        if (a.date !== b.date || a.amount + b.amount !== s.amount || dist(a.date, s.date) > DAYS) continue;
-        a.done = b.done = s.done = true;
-        kept.push({ s: [s], r: [a, b] });
-        joined.push({ statement: [ref(s)], ledger: [plainL(a), plainL(b)] });
-        break found;
-      }
+    const set = sumOf(lrows, s.amount, s.date);
+    if (!set) continue;
+    for (const x of set) x.done = true;
+    s.done = true;
+    kept.push({ s: [s], r: set });
+    joined.push({ statement: [ref(s)], ledger: set.map(plainL) });
   }
 
   // 3. close amounts on close dates: a typo

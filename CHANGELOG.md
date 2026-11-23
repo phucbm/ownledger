@@ -1,5 +1,29 @@
 # Changelog
 
+## 2.2.0 (2026-11-23)
+
+Batch writes, and checking every statement of a card in one run (plan 005). Data format stays 1.
+
+- **Batch writes:** the connector's `batch` tool previews many adds, edits and voids as **one** change: one preview,
+  one go from the owner, one commit ("Batch: 28 adds, 4 edits, 4 voids"). Ops run in order on the evolving data, check
+  runs once on the result, and if any op fails the whole batch is refused, naming the op. The preview shows every
+  transaction (up to 200) and the balance change per account. Each row's trail gets the batch's reason plus the op's
+  own. Also `POST /api/batch` + `/api/batch/apply` for the dashboard (no UI yet).
+- **`ownledger statements reconcile <card>`** (`--from`/`--to`, `--json`): every filed statement against the ledger.
+  Per month the bank's closing figure next to ownledger's (gap, change from the month before, and the part that is
+  only timing), then the rows missing on the ledger, ledger rows on no statement, amounts that differ, rows probably on
+  another account, and balance adjustments covering a gap. Fee + VAT (or purchase + DCC fee + VAT) booked as one row,
+  and purchases refunded in full, are matched and shown apart. `--json` carries a `batch` op hint per item.
+  `--save-bank-amounts` saves each month's bank figure in `data/cards/statements.yaml` (preview; `--yes`). Reads the
+  PDFs on your computer only, as before.
+- **Statement rows by general rules**, no bank-specific code: the PDF's text with its columns kept, a row is a date +
+  a description + an amount (with CR/DR, minus, brackets, currency marks; foreign-currency amounts skipped; debit and
+  credit columns when the statement has them; a description wrapped onto the lines around the row). What a bank does
+  differently is data in `imports/statements/sources.yaml`: `closing_label`, `credit_words`, `skip_words`,
+  `amount_column`.
+- `ownledger statements check` now shows the rows it read and the text with columns kept.
+- Connector instructions: use `batch` for more than ~3 writes.
+
 ## 2.1.1 (2026-11-23)
 
 - **Fix: the dashboard failed to load ("Could not load data:" with no reason) once statement PDFs were filed.** The

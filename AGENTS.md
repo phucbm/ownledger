@@ -86,7 +86,11 @@ dashboard ("Statement PDF" on a statement) and never reads it. Optional: a repo 
 
 `imports/statements/sources.yaml`, per account id: `from` (the bank's sender address), `subject` (words in the subject),
 `password` (the name of the variable in `.env.statements`, e.g. `PW_WOORI`), `password_hint` (what the password is made
-of, e.g. "date of birth ddmmyy"; never the password itself). The bank's own email facts, nothing else.
+of, e.g. "date of birth ddmmyy"; never the password itself). The bank's own email facts, nothing else. Optional, how to
+read the statement when the general rules don't fit (data, never code): `closing_label` (the label of the bank's
+closing figure, e.g. "Payable amount"; a string or a list), `credit_words` (words that mark a row as money back on the
+card: payment, refund, cashback…), `skip_words` (lines that are never rows), `amount_column` (which amount on a row is
+its amount when there are several, zeros and other currencies not counted: `1` = first, `-1` = last, the default).
 
 Passwords live in `.env.statements` at the repo root (`PW_<ACCOUNT_ID>=…` or `PW_<BANK>=…`, the first word of the id;
 or the variable `sources.yaml` names). It is git-ignored. Never commit it, print it, or send it anywhere.
@@ -107,13 +111,25 @@ itself never connects to email.
    again with `--yes` (files and commits).
 5. `npx ownledger statements list` shows which months are missing between the first and the last; report them.
 
-### Check a statement against the ledger
+### Check a card's statements against the ledger
 
-`npx ownledger statements check <account-id> <YYYY-MM>` (`--json` for structured output) prints the period,
-ownledger's figures for it, its transactions on the card, and the statement's text. Compare them and tell the owner
-what's missing, extra or different (amounts, dates, fees, cashback, the closing balance). Never change anything from
-the PDF on your own: each fix is a normal write (preview → go). The bank's statement amount goes in with
-`add_statement_amount`.
+**To check a card's statements, run `npx ownledger statements reconcile <account-id>`** (`--from`/`--to YYYY-MM` to
+narrow it, `--json` for data). Don't write your own PDF parsing or matching. For every filed statement it shows the
+bank's closing figure next to ownledger's (gap = ownledger − bank, the change from the month before, and the part of
+the gap that is only timing: rows the bank and the ledger put on opposite sides of a close date). Then it lists rows on
+a statement but not on the ledger, ledger rows on no statement, amounts that differ (typos, FX), rows probably booked
+on another account, and balance adjustments (`_adjust`) covering a gap. Fees booked with their VAT as one row, and
+purchases refunded in full, are matched and shown apart; they need no fix.
+
+Propose the fixes to the owner as **one batch** (the connector's `batch` tool: one preview, one go, one commit; the
+`hint` of each item in `--json` is the op to start from: fill in the category). **Never add a balance adjustment to
+cover a gap**: find the real rows. If the closing figure isn't found or rows look wrong, add the layout fields to
+`sources.yaml` (above) rather than working around it. `--save-bank-amounts` saves each month's bank figure in
+`data/cards/statements.yaml` (preview; `--yes` after the owner's go) so `cards` / `card_statement` show the gap
+without the PDFs.
+
+`npx ownledger statements check <account-id> <YYYY-MM>` shows one statement: ownledger's figures and transactions for
+the period, the rows read from the PDF, and its text with columns kept.
 
 `npx ownledger check` warns about statement files that don't fit (a folder that isn't an account, a name that isn't
 `YYYY-MM.pdf`, a PDF still locked).
@@ -123,7 +139,7 @@ the PDF on your own: each fix is a normal write (preview → go). The bank's sta
 1. Show the owner exactly what will change (the transactions, with amounts and accounts) and wait for their go.
 2. Never invent an amount, date or account. Ask if anything is missing.
 3. Run `npx ownledger check`; it must pass.
-4. One commit per change, with a readable message.
+4. One commit per change, with a readable message. Many related transaction fixes are one change: use `batch`.
 
 ## First import of a new app
 
