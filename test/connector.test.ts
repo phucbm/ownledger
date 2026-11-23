@@ -129,11 +129,26 @@ describe("connector: batch writes", () => {
     await expect(w.call("batch", { reason: "fix things", ops: [{ op: "add", date: "2026-10-05", kind: "expense", amount: 1, account: "card", category: "other" }, { op: "edit", id: "zzz", amount: 3 }] })).rejects.toThrow(/op 2 \(edit zzz\)/);
     await expect(w.call("batch", { reason: "fix things", ops: [{ op: "void" }] })).rejects.toThrow(/needs an id/);
   });
+  it("batch saves bank statement amounts with the transaction fixes, in one commit", async () => {
+    const w = world();
+    const p = await w.call("batch", { reason: "MSB figures", ops: [
+      { op: "statement_amount", account: "card", statement_date: "2026-10-05", amount: 120000 },
+      { op: "statement_amount", account: "card", statement_date: "2026-09-05", amount: 0 },
+      { op: "add", date: "2026-10-21", kind: "expense", amount: 5000, account: "card", category: "other", note: "fee" },
+    ] });
+    expect(p.will[0]).toBe("batch: 1 add, 2 bank amounts");
+    await w.call("apply", { preview_id: p.preview_id });
+    expect(w.state.commits).toHaveLength(1);
+    expect(w.state.commits[0]!.paths.sort()).toEqual(["data/cards/statements.yaml", "data/ledger/2026/10.jsonl"]);
+    expect(parseYaml(w.state.files["data/cards/statements.yaml"]!)).toEqual([{ account: "card", statement_date: "2026-09-05", amount: 0 }, { account: "card", statement_date: "2026-10-05", amount: 120000 }]);
+    await expect(w.call("batch", { reason: "bad one", ops: [{ op: "statement_amount", account: "nope", statement_date: "2026-10-05", amount: 1 }] })).rejects.toThrow(/no account nope/);
+    await expect(w.call("batch", { reason: "bad one", ops: [{ op: "add", date: "2026-10-05", kind: "expense", amount: 0, account: "card", category: "other" }] })).rejects.toThrow(/positive/);
+  });
   it("POST /api/batch previews, /api/batch/apply commits once", async () => {
     const w = world();
     const r = await w.http("batch", { method: "POST", body: JSON.stringify({ reason: "dash", ops: [{ op: "void", id: "a1" }, { op: "void", id: "a2" }] }) });
     expect(r.status).toBe(200);
-    expect(r.body.counts).toEqual({ add: 0, edit: 0, void: 2 });
+    expect(r.body.counts).toEqual({ add: 0, edit: 0, void: 2, statement_amount: 0 });
     const a = await w.http("batch/apply", { method: "POST", body: JSON.stringify({ preview_id: r.body.preview_id }) });
     expect(a.status).toBe(200);
     expect(w.state.commits).toHaveLength(1);

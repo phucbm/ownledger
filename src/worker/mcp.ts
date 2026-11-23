@@ -404,15 +404,17 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
   );
 
   const batchOp = z.object(txFields).partial().extend({
-    op: z.enum(["add", "edit", "void"]),
+    op: z.enum(["add", "edit", "void", "statement_amount"]),
     id: z.string().optional().describe("edit / void: the transaction id"),
+    amount: z.number().int().optional().describe("add/edit: positive, whole base-currency units; statement_amount: the bank's amount (0 allowed)"),
+    statement_date: z.string().optional().describe("statement_amount: the statement's closing date yyyy-mm-dd (with account and amount: the bank's amount, like add_statement_amount)"),
     reason: z.string().trim().max(A.REASON_MAX).optional().describe("optional: this op's own reason, added to the batch's"),
   });
 
   server.registerTool(
     "batch",
     {
-      description: `PREVIEW many adds, edits and voids as ONE change (writes nothing): one preview, one go, one commit. Use it for more than ~3 writes (e.g. fixes from a statement check). Each op takes the same fields as add_transaction / edit_transaction / void_transaction plus op. Ops run in order; if any op fails, the whole batch is refused and the reply names the op. Max ${A.BATCH_MAX} ops.`,
+      description: `PREVIEW many adds, edits and voids as ONE change (writes nothing): one preview, one go, one commit. Use it for more than ~3 writes (e.g. fixes from a statement check). Each op takes the same fields as add_transaction / edit_transaction / void_transaction plus op; op statement_amount (account, statement_date, amount) saves the bank's amount for a card statement like add_statement_amount. Ops run in order; if any op fails, the whole batch is refused and the reply names the op. Max ${A.BATCH_MAX} ops.`,
       inputSchema: z.object({ ops: z.array(batchOp).min(1).max(A.BATCH_MAX), reason }),
       annotations: pv,
     },
@@ -420,6 +422,10 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
       const s = await snap();
       const p = poolOf(s.ledger, dashboardOf(s.files, props.login)?.prefs?.pool, now());
       const list = ops.map((o, i) => {
+        if (o.op === "statement_amount") {
+          if (!o.account || !o.statement_date || o.amount === undefined) throw new A.ActionError(`batch refused: op ${i + 1} (statement_amount) needs account, statement_date and amount`);
+          return o;
+        }
         if (o.op !== "add" && !o.id) throw new A.ActionError(`batch refused: op ${i + 1} (${o.op}) needs an id`);
         if (o.op === "add" && !o.date) throw new A.ActionError(`batch refused: op ${i + 1} (add) needs a date`);
         if (o.op === "add" && !o.lines?.length && !o.account && p.on && p.default_account) return { ...o, account: p.default_account };
