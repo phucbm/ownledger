@@ -14,6 +14,7 @@ import type { Ledger } from "../engine/types.js";
 import type { FileMap } from "../engine/load.js";
 import { moduleApi } from "../modules/api.js";
 import { applyChange } from "../engine/write.js";
+import { batch, BATCH_MAX, type BatchOp } from "../engine/actions.js";
 import { parseMapping } from "../import/mapping.js";
 import { runImport } from "../import/run.js";
 import { readWorkbook } from "../import/workbook.js";
@@ -266,6 +267,21 @@ export async function api(req: Request, env: Env, source?: DataSource): Promise<
         return json({ report, preview_id: id, message });
       }
       case "import/apply": {
+        if (req.method !== "POST") return json({ error: "POST" }, 405);
+        const { preview_id } = (await req.json()) as { preview_id: string };
+        return json(await applyPending(env, src, preview_id));
+      }
+      case "batch": {
+        // Preview many transaction adds/edits/voids as one change; POST batch/apply commits it (one commit).
+        if (req.method !== "POST") return json({ error: "POST" }, 405);
+        const body = (await req.json()) as { ops?: BatchOp[]; reason?: string };
+        if (!Array.isArray(body.ops) || !body.ops.length || body.ops.length > BATCH_MAX) return json({ error: `ops: 1 to ${BATCH_MAX}` }, 400);
+        if (!body.reason?.trim()) return json({ error: "reason is required" }, 400);
+        const p = batch(s.files, body.ops, { via: "dashboard", client: login, reason: body.reason });
+        const id = await savePending(env, { baseSha: s.sha, files: p.files, message: p.message, summary: p.summary, created: new Date().toISOString() });
+        return json({ preview_id: id, will: p.summary, message: p.message, counts: p.counts, balance_change: p.balanceChange, transactions: [...(p.change.addTransactions ?? []), ...(p.change.replaceTransactions ?? [])], warnings: p.warnings.map((w) => w.message) });
+      }
+      case "batch/apply": {
         if (req.method !== "POST") return json({ error: "POST" }, 405);
         const { preview_id } = (await req.json()) as { preview_id: string };
         return json(await applyPending(env, src, preview_id));

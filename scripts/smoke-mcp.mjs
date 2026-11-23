@@ -55,7 +55,7 @@ for (const [n, a] of [["today", {}], ["report", { period: about.v.today.slice(0,
 }
 if (write) {
   const acc = (await call("rules")).v.accounts[0].split(":")[0];
-  const p = await call("add_transaction", { date: about.v.today, kind: "expense", amount: 12345, account: acc, category: "food/cafe", note: "smoke test" });
+  const p = await call("add_transaction", { date: about.v.today, kind: "expense", amount: 12345, account: acc, category: "food/cafe", note: "smoke test", reason: "smoke test" });
   console.log("✓ preview:", JSON.stringify(p.v).slice(0, 200));
   const a = await call("apply", { preview_id: p.v.preview_id });
   console.log("✓ apply:", JSON.stringify(a.v));
@@ -63,6 +63,13 @@ if (write) {
   console.log("✓ apply twice refused:", again.isError === true, again.content[0].text.slice(0, 80));
   const found = await call("transactions", { text: "smoke test" });
   console.log("✓ found after commit:", found.v.total);
-  const v = await call("void_transaction", { id: found.v.items[0].id });
+  const v = await call("void_transaction", { id: found.v.items[0].id, reason: "smoke test cleanup" });
   console.log("✓ void applied:", JSON.stringify((await call("apply", { preview_id: v.v.preview_id })).v));
+  // batch: 3 adds in one preview and one commit, then one batch voiding them
+  const b = await call("batch", { reason: "smoke batch", ops: [1, 2, 3].map((n) => ({ op: "add", date: about.v.today, kind: "expense", amount: 1000 * n, account: acc, category: "food/cafe", note: `smoke batch ${n}` })) });
+  console.log(`✓ batch preview (${b.ms} ms):`, JSON.stringify(b.v.will), JSON.stringify(b.v.balance_change));
+  console.log("✓ batch apply:", JSON.stringify((await call("apply", { preview_id: b.v.preview_id })).v));
+  const made = (await call("transactions", { text: "smoke batch" })).v.items.filter((t) => !t.void);
+  const bv = await call("batch", { reason: "smoke batch cleanup", ops: made.map((t) => ({ op: "void", id: t.id })) });
+  console.log("✓ batch void applied:", JSON.stringify((await call("apply", { preview_id: bv.v.preview_id })).v));
 }

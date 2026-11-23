@@ -99,6 +99,48 @@ describe("connector: AI-built widgets", () => {
   });
 });
 
+describe("connector: batch writes", () => {
+  it("batch previews many ops as one change; apply makes one commit; trail has the batch's reason", async () => {
+    const w = world();
+    const p = await w.call("batch", {
+      reason: "statement check October",
+      ops: [
+        { op: "add", date: "2026-10-05", kind: "expense", amount: 9091, account: "card", category: "other", note: "Annual fee" },
+        { op: "add", date: "2026-10-05", kind: "expense", amount: 909, account: "card", category: "other", note: "Annual fee VAT", reason: "VAT" },
+        { op: "edit", id: "a2", amount: 125000 },
+        { op: "void", id: "a1" },
+        { op: "add", date: "2026-10-06", kind: "expense", amount: 1000, category: "food", note: "pool default" },
+      ],
+    });
+    expect(p.will[0]).toBe("batch: 3 adds, 1 edit, 1 void");
+    expect(p.transactions).toHaveLength(5);
+    expect(p.balance_change).toEqual({ card: -15000, cash: 50000 - 1000 });
+    expect(w.state.commits).toEqual([]);
+    const a = await w.call("apply", { preview_id: p.preview_id });
+    expect(a.done).toBe(true);
+    expect(w.state.commits).toHaveLength(1);
+    expect(w.state.commits[0]!.message).toMatch(/^Batch: 3 adds, 1 edit, 1 void\n\nReason: statement check October/);
+    const rows = w.state.files["data/ledger/2026/10.jsonl"]!.trim().split("\n").map((l) => JSON.parse(l));
+    expect(rows.find((r) => r.note === "Annual fee VAT").trail[0].reason).toBe("statement check October; VAT");
+    expect(rows.find((r) => r.id === "a1").void).toBe(true);
+  });
+  it("one bad op refuses the whole batch and names it", async () => {
+    const w = world();
+    await expect(w.call("batch", { reason: "fix things", ops: [{ op: "add", date: "2026-10-05", kind: "expense", amount: 1, account: "card", category: "other" }, { op: "edit", id: "zzz", amount: 3 }] })).rejects.toThrow(/op 2 \(edit zzz\)/);
+    await expect(w.call("batch", { reason: "fix things", ops: [{ op: "void" }] })).rejects.toThrow(/needs an id/);
+  });
+  it("POST /api/batch previews, /api/batch/apply commits once", async () => {
+    const w = world();
+    const r = await w.http("batch", { method: "POST", body: JSON.stringify({ reason: "dash", ops: [{ op: "void", id: "a1" }, { op: "void", id: "a2" }] }) });
+    expect(r.status).toBe(200);
+    expect(r.body.counts).toEqual({ add: 0, edit: 0, void: 2 });
+    const a = await w.http("batch/apply", { method: "POST", body: JSON.stringify({ preview_id: r.body.preview_id }) });
+    expect(a.status).toBe(200);
+    expect(w.state.commits).toHaveLength(1);
+    expect((await w.http("batch", { method: "POST", body: JSON.stringify({ ops: [] }) })).status).toBe(400);
+  });
+});
+
 describe("connector: pool and cards", () => {
   it("with the pool on, spending with no account goes to the default account; rules return the pool", async () => {
     const w = world();

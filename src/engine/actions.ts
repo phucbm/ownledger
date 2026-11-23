@@ -106,6 +106,18 @@ export function linesOf(t: SimpleTx): Line[] {
 }
 
 export function addTransaction(files: FileMap, t: SimpleTx, meta?: WriteMeta): Planned {
+  const b = buildAdd(t, meta);
+  return plan(files, b.change, b.message);
+}
+
+interface Built {
+  change: Change;
+  message: string;
+  tx: Transaction;
+  old?: Transaction;
+}
+
+function buildAdd(t: SimpleTx, meta?: WriteMeta): Built {
   if (!isDate(t.date)) throw new ActionError("date must be yyyy-mm-dd");
   const tx: Transaction = {
     id: newId(),
@@ -118,7 +130,8 @@ export function addTransaction(files: FileMap, t: SimpleTx, meta?: WriteMeta): P
     ...(t.plan ? { plan: t.plan } : {}),
     lines: linesOf(t),
   };
-  return plan(files, { addTransactions: [trailed(tx, "add", meta)] }, withMeta(`Add: ${t.date} ${t.note ?? ""}`.trim(), meta));
+  const done = trailed(tx, "add", meta);
+  return { change: { addTransactions: [done] }, message: withMeta(`Add: ${t.date} ${t.note ?? ""}`.trim(), meta), tx: done };
 }
 
 function findTx(files: FileMap, id: string): Transaction {
@@ -131,6 +144,11 @@ function findTx(files: FileMap, id: string): Transaction {
 }
 
 export function editTransaction(files: FileMap, id: string, patch: Partial<SimpleTx>, meta?: WriteMeta): Planned {
+  const b = buildEdit(files, id, patch, meta);
+  return plan(files, b.change, b.message);
+}
+
+function buildEdit(files: FileMap, id: string, patch: Partial<SimpleTx>, meta?: WriteMeta): Built {
   const old = findTx(files, id);
   const next: Transaction = { ...old };
   for (const k of ["date", "time", "note", "who", "event", "tags", "plan"] as const) {
@@ -140,7 +158,8 @@ export function editTransaction(files: FileMap, id: string, patch: Partial<Simpl
     next.lines = linesOf({ ...simpleOf(old), ...patch } as SimpleTx);
   }
   if (!isDate(next.date)) throw new ActionError("date must be yyyy-mm-dd");
-  return plan(files, { replaceTransactions: [trailed(next, "edit", meta)] }, withMeta(`Edit: ${next.date} ${next.note ?? ""}`.trim(), meta));
+  const done = trailed(next, "edit", meta);
+  return { change: { replaceTransactions: [done] }, message: withMeta(`Edit: ${next.date} ${next.note ?? ""}`.trim(), meta), tx: done, old };
 }
 
 /** Best-effort simple view of a transaction (to let an edit change just one field). */
@@ -160,10 +179,105 @@ function simpleOf(t: Transaction): Partial<SimpleTx> {
 }
 
 export function voidTransaction(files: FileMap, id: string, reason?: string, meta?: WriteMeta): Planned {
+  const b = buildVoid(files, id, reason, meta);
+  return plan(files, b.change, b.message);
+}
+
+function buildVoid(files: FileMap, id: string, reason?: string, meta?: WriteMeta): Built {
   const old = findTx(files, id);
   if (old.void) throw new ActionError(`${id} is already void`);
   const next = { ...old, void: true, ...(reason ? { void_reason: reason } : {}) };
-  return plan(files, { replaceTransactions: [trailed(next, "void", meta)] }, withMeta(`Void: ${old.date} ${old.note ?? ""}`.trim(), meta));
+  const done = trailed(next, "void", meta);
+  return { change: { replaceTransactions: [done] }, message: withMeta(`Void: ${old.date} ${old.note ?? ""}`.trim(), meta), tx: done, old };
+}
+
+/* ------------------------------------------------------------------ batch */
+
+export type BatchOp =
+  | ({ op: "add"; reason?: string } & SimpleTx)
+  | ({ op: "edit"; id: string; reason?: string } & Partial<SimpleTx>)
+  | { op: "void"; id: string; reason?: string };
+
+export const BATCH_MAX = 200;
+
+export interface BatchPlanned extends Planned {
+  /** Change in each account's balance (base currency) over the whole batch. */
+  balanceChange: Record<string, number>;
+  counts: { add: number; edit: number; void: number };
+}
+
+function joinReason(batch?: string, own?: string): string | undefined {
+  const r = [batch?.trim(), own?.trim()].filter(Boolean).join("; ").replace(/\s+/g, " ");
+  if (!r) return undefined;
+  return r.length > REASON_MAX ? r.slice(0, REASON_MAX - 1) + "…" : r;
+}
+
+/**
+ * Many adds, edits and voids as one change: the ops run one after another on the evolving files
+ * (an op can edit or void a row an earlier op added), check runs once on the result, one commit.
+ * Any op failing refuses the whole batch, naming the op.
+ */
+export function batch(files: FileMap, ops: BatchOp[], meta?: WriteMeta): BatchPlanned {
+  if (!ops.length) throw new ActionError("batch: no ops");
+  if (ops.length > BATCH_MAX) throw new ActionError(`batch: at most ${BATCH_MAX} ops (got ${ops.length})`);
+  let cur: FileMap = files;
+  const changed = new Set<string>();
+  const finals = new Map<string, Transaction>(); // id -> final version
+  const originals = new Map<string, Transaction | null>(); // id -> version before the batch (null: added here)
+  const counts = { add: 0, edit: 0, void: 0 };
+  ops.forEach((o, i) => {
+    const m = meta ? { ...meta, reason: joinReason(meta.reason, o.reason) } : undefined;
+    let b: Built;
+    try {
+      if (o.op === "add") {
+        const { op: _op, reason: _r, ...t } = o;
+        b = buildAdd(t as SimpleTx, m);
+      } else if (o.op === "edit") {
+        const { op: _op, reason: _r, id, ...patch } = o;
+        b = buildEdit(cur, id, patch, m);
+      } else if (o.op === "void") {
+        b = buildVoid(cur, o.id, o.reason ?? meta?.reason, m);
+      } else throw new ActionError(`unknown op "${(o as { op: unknown }).op}"`);
+    } catch (e) {
+      throw new ActionError(`batch refused: op ${i + 1} (${(o as { op: string }).op}${"id" in o && o.id ? ` ${o.id}` : ""}) failed: ${(e as Error).message}`);
+    }
+    counts[o.op]++;
+    if (!originals.has(b.tx.id)) originals.set(b.tx.id, b.old ?? null);
+    finals.set(b.tx.id, b.tx);
+    const out = applyChange(cur, b.change);
+    for (const p of Object.keys(out)) changed.add(p);
+    cur = { ...cur, ...out };
+  });
+  const r = checkFiles(cur);
+  if (!r.ok) throw new ActionError(`batch refused, the result would not pass check:\n${r.errors.slice(0, 10).map((e) => `- ${e.where ? `[${e.where}] ` : ""}${e.message}`).join("\n")}`);
+  const before = new Set(checkFiles(files).warnings.map((w) => `${w.file}|${w.where}|${w.message}`));
+  const out: FileMap = {};
+  for (const p of changed) if (cur[p] !== files[p]) out[p] = cur[p]!;
+  const add: Transaction[] = [];
+  const rep: Transaction[] = [];
+  const balanceChange: Record<string, number> = {};
+  const bump = (t: Transaction | null | undefined, sign: number) => {
+    if (!t || t.void) return;
+    for (const l of t.lines) if (l.account) balanceChange[l.account] = (balanceChange[l.account] ?? 0) + sign * l.amount;
+  };
+  for (const [id, t] of finals) {
+    const old = originals.get(id) ?? null;
+    (old ? rep : add).push(t);
+    bump(t, 1);
+    bump(old, -1);
+  }
+  for (const [k, v] of Object.entries(balanceChange)) if (v === 0) delete balanceChange[k];
+  const parts = [counts.add && `${counts.add} add${counts.add > 1 ? "s" : ""}`, counts.edit && `${counts.edit} edit${counts.edit > 1 ? "s" : ""}`, counts.void && `${counts.void} void${counts.void > 1 ? "s" : ""}`].filter(Boolean);
+  const change: Change = { ...(add.length ? { addTransactions: add } : {}), ...(rep.length ? { replaceTransactions: rep } : {}) };
+  return {
+    change,
+    files: out,
+    summary: [`batch: ${parts.join(", ")}`, ...describeChange(change)],
+    message: withMeta(`Batch: ${parts.join(", ")}`, meta),
+    warnings: r.warnings.filter((w) => !before.has(`${w.file}|${w.where}|${w.message}`)),
+    balanceChange,
+    counts,
+  };
 }
 
 /** The ledger of a set of files, for actions that read it before building a change. */

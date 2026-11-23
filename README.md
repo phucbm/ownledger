@@ -102,7 +102,8 @@ ownledger deploy           deploy or update your Worker (--openwallet / --no-ope
 ownledger dev [dir]        run your Worker locally against the local folder (sign-in skipped; --openwallet[=<url>])
 ownledger statements add <card> <file.pdf>…   unlock and file bank statement PDFs (preview; --yes files and commits)
 ownledger statements list [<card>]            which months each card has, and which are missing
-ownledger statements check <card> <YYYY-MM>   the statement's text next to the ledger's figures for that period
+ownledger statements check <card> <YYYY-MM>   one statement's rows and text next to the ledger's figures for that period
+ownledger statements reconcile <card>         every filed statement against the ledger: gaps per month, missing rows, typos
 ```
 
 ### Bank statements (optional)
@@ -111,7 +112,9 @@ Keep your cards' statement PDFs in your data repo and open them from the dashboa
 your own AI agent on your computer (Claude Code or similar, with a Gmail connector), following
 [AGENTS.md](AGENTS.md#collect-statements-from-gmail); ownledger never connects to your email. `ownledger statements add`
 removes the bank's password (kept in `.env.statements`, git-ignored, on your computer only) and files each PDF under the
-month of its statement's close date. `ownledger statements check` lets your agent compare a statement with your ledger.
+month of its statement's close date. `ownledger statements reconcile <card>` checks every statement of a card against
+your ledger in one run (the bank's closing figure per month, rows missing or different), so your agent can propose the
+fixes as one `batch`: one preview, one go, one commit.
 
 ## Development
 
