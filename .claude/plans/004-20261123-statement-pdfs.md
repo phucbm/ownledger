@@ -1,6 +1,6 @@
 # 004: Bank statements: collect from Gmail, open in the dashboard, check transactions
 
-Written: 2026-11-23. Status: Approved 2026-11-23
+Written: 2026-11-23. Status: In progress
 Related: plan 002 (cards, statement periods), plan 003 (dashboard)
 
 ## Goal
@@ -9,8 +9,8 @@ Any ownledger user can keep their cards' statements, as the bank's PDFs, in thei
 1. **Collect** them from Gmail with their AI agent (Claude Code or similar, with a Gmail connector) and one
    ownledger command that unlocks and files them.
 2. **Open** a statement's PDF from the dashboard.
-3. **Check** a statement against the ledger: the connector gives the statement's text next to the ledger's
-   transactions for the same period, so the assistant can say what's missing or different.
+3. **Check** a statement against the ledger: a CLI command on the user's computer gives the statement's text next
+   to the ledger's transactions for the same period, so their local agent can say what's missing or different.
 
 Everything is optional. A repo without statements works as it does now. No data format change.
 
@@ -19,6 +19,11 @@ Everything is optional. A repo without statements works as it does now. No data 
 - **Collection: an agent on the user's computer only.** The Worker never connects to Gmail. (In a claude.ai
   chat the assistant can read a Gmail PDF but can't hand the file to ownledger, so collection needs a tool
   that can save files: Claude Code, Codex, etc.)
+- **Read on the user's computer only (2026-11-23, after step 1).** The PDFs are committed to the data repo as
+  planned, but only the CLI on the user's computer reads their text. The Worker never parses a statement: it only
+  streams a PDF's bytes to the signed-in dashboard. (Step 1 measured 13–26 ms CPU per real 2-page statement for text
+  extraction, over the free plan's 10 ms; the owner chose machine-only reading over a paid-plan dependency.)
+  So section 4 becomes the CLI command `ownledger statements check`; no connector tool reads statements.
 - **Stored unlocked.** The command removes the bank's password before saving. Passwords stay on the user's
   computer (`.env.statements`, git-ignored), never in the repo or the Worker.
 
@@ -84,14 +89,13 @@ The steps an agent follows, the way it does a first import:
 - **Dashboard.** `StatementSheet`: a plain "PDF" link ("Sao kê PDF") next to the period line when `pdf`, opening
   in a new tab. No colour, no badge; the statement list stays as it is.
 
-### 4. Connector: check a statement
+### 4. CLI: check a statement (on the user's computer)
 
-- `card_statement` and `cards` add `pdf: "imports/statements/<id>/<YYYY-MM>.pdf"` when the file exists.
-- New `statement_check(account, close)`: returns the PDF's text (extracted in the Worker with a serverless build
-  of pdf.js, e.g. `unpdf`; checked in step 1 to run in Workers within limits) and ownledger's own transactions for
-  that period with the statement totals. The assistant compares them and reports what's missing, extra or
-  different. Read-only; any fix goes through the usual add/edit preview → go → apply.
-- No bank-specific parsing in ownledger: the text goes to the assistant as it is.
+- `ownledger statements check <account-id> <YYYY-MM> [--json]`: prints the period, ownledger's statement figures,
+  its transactions on the card in that period, and the PDF's text (unpdf, in Node). The user's local agent compares
+  them and reports what's missing, extra or different. Read-only; fixes go through the usual preview → go → apply.
+- No bank-specific parsing in ownledger: the text goes to the agent as it is. The Worker and connector don't read
+  statements (superseded: the planned `statement_check` connector tool).
 
 ## Hard rules
 
@@ -101,12 +105,14 @@ locked with a made-up password), never real statements.
 
 ## Steps
 
-1. Spike: qpdf-wasm (or pure-JS) unlock in Node; `unpdf` text extraction in a Worker (size, CPU time). Pick both.
+1. ✓ Spike: `@neslinesli93/qpdf-wasm` unlocks AES-256/AES-128/RC4 in Node, clean error on a wrong password
+   (`@pdfsmaller/pdf-decrypt` failed all four). `unpdf` works in Workers (+577 KiB gzip) but needs 13–26 ms CPU per
+   real statement: text reading moved to the CLI (decision above).
 2. CLI `statements add` / `list`, check warnings, `sources.yaml` loading, tests.
 3. `filesAt` paths, `DataSource.blob` (GitHub + dev), `statement-pdf` route, `pdf` flag, tests (200/401/404/400,
    dev path limit).
 4. Dashboard link, types, en/vi strings.
-5. `statement_check` tool and `pdf` field in `card_statement` / `cards`, tests.
+5. `ownledger statements check`, tests.
 6. `templates/AGENTS.md` section, README (data layout, the agent flow, the Gmail note), CHANGELOG; release 2.1.0.
 7. Try it on the owner's private data repo with `ownledger dev` (statements already filed there by hand), collect
    one more bank end to end with an agent, then deploy.
