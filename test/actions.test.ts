@@ -36,6 +36,24 @@ describe("actions", () => {
     const v = voidTransaction({ ...files, ...e.files }, id);
     expect(after({ ...files, ...e.files }, v.files).transactions.find((x) => x.id === id)!.void).toBe(true);
   });
+  it("editing only the amount of a 0-amount row takes the kind from the category's side", () => {
+    const zero = (note: string, lines: { account?: string; category?: string; amount: number }[]) => {
+      const p = addTransaction(demo, { date: "2026-11-03", note, lines });
+      return { files: { ...demo, ...p.files }, id: after(demo, p.files).transactions.find((t) => t.note === note)!.id };
+    };
+    const exp = zero("Zero fee", [{ account: "card-visa", amount: 0 }, { category: "food/eating-out", amount: 0 }]);
+    const e1 = editTransaction(exp.files, exp.id, { amount: 50000 });
+    expect(after(exp.files, e1.files).transactions.find((x) => x.id === exp.id)!.lines)
+      .toEqual([{ account: "card-visa", amount: -50000 }, { category: "food/eating-out", amount: 50000 }]);
+    const inc = zero("Zero cashback", [{ account: "card-visa", amount: 0 }, { category: "cashback", amount: 0 }]);
+    const e2 = editTransaction(inc.files, inc.id, { amount: 30000 });
+    expect(after(inc.files, e2.files).transactions.find((x) => x.id === inc.id)!.lines)
+      .toEqual([{ account: "card-visa", amount: 30000 }, { category: "cashback", amount: -30000 }]);
+    const tr = zero("Zero transfer", [{ account: "vcb", amount: 0 }, { account: "cash", amount: 0 }]);
+    const e3 = editTransaction(tr.files, tr.id, { amount: 1000 });
+    expect(after(tr.files, e3.files).transactions.find((x) => x.id === tr.id)!.lines)
+      .toEqual([{ account: "vcb", amount: -1000 }, { account: "cash", amount: 1000 }]);
+  });
   it("accounts: add, edit, close; unknown types are fine", () => {
     const a = addAccount(demo, { id: "pension", name: "Pension", type: "pension_fund", details: { x: 1 } });
     expect(a.warnings.map((w) => w.message).join()).toMatch(/unknown type/);

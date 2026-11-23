@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- **Fix: editing only the amount of a 0-amount row** booked it as income (the kind came from the sign of 0), so the
+  account went up instead of down. The kind now comes from the category's side (income or expense; expense for system
+  categories), and a 0 transfer keeps its lines' order.
+- **Fix: `statements reconcile` read a statement's period line as a row** ("21/06/2025 - 20/07/2025   100,000", the
+  dates and the minimum due on MSB), giving a false "missing" row each month, sometimes matched to another account.
+  Lines holding a date range are skipped.
+
 ## 2.3.0 (2026-11-23)
 
 - **`batch` saves bank statement amounts too:** op `statement_amount` (`account`, `statement_date`, `amount`; 0

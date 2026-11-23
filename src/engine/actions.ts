@@ -156,27 +156,42 @@ function buildEdit(files: FileMap, id: string, patch: Partial<SimpleTx>, meta?: 
     if (patch[k] !== undefined) (next as Record<string, unknown>)[k] = patch[k];
   }
   if (patch.lines || patch.amount || patch.kind || patch.account || patch.category || patch.to_account) {
-    next.lines = linesOf({ ...simpleOf(old), ...patch } as SimpleTx);
+    next.lines = linesOf({ ...simpleOf(old, files), ...patch } as SimpleTx);
   }
   if (!isDate(next.date)) throw new ActionError("date must be yyyy-mm-dd");
   const done = trailed(next, "edit", meta);
   return { change: { replaceTransactions: [done] }, message: withMeta(`Edit: ${next.date} ${next.note ?? ""}`.trim(), meta), tx: done, old };
 }
 
-/** Best-effort simple view of a transaction (to let an edit change just one field). */
-function simpleOf(t: Transaction): Partial<SimpleTx> {
+/**
+ * Best-effort simple view of a transaction (to let an edit change just one field).
+ * A 0 amount has no sign, so the kind comes from the category's side (income/expense),
+ * and a 0 transfer keeps its lines' order (first line is the source).
+ */
+function simpleOf(t: Transaction, files: FileMap): Partial<SimpleTx> {
   const acc = t.lines.filter((l) => l.account);
   const cat = t.lines.filter((l) => l.category);
   if (t.lines.length === 2 && acc.length === 1 && cat.length === 1) {
     const a = acc[0]!;
-    return { kind: a.amount < 0 ? "expense" : "income", amount: Math.abs(a.amount), account: a.account, category: cat[0]!.category };
+    const category = cat[0]!.category!;
+    const kind = a.amount < 0 ? "expense" : a.amount > 0 ? "income" : categoryKindOf(files, category);
+    return { kind, amount: Math.abs(a.amount), account: a.account, category };
   }
   if (t.lines.length === 2 && acc.length === 2) {
-    const from = acc.find((l) => l.amount < 0)!;
-    const to = acc.find((l) => l.amount > 0)!;
-    return { kind: "transfer", amount: to.amount, account: from.account, to_account: to.account };
+    const from = acc.find((l) => l.amount < 0) ?? acc[0]!;
+    const to = acc.find((l) => l !== from)!;
+    return { kind: "transfer", amount: Math.abs(to.amount), account: from.account, to_account: to.account };
   }
   return { lines: t.lines };
+}
+
+/** A category's side from data/categories.yaml; expense when unknown (system categories, a missing file). */
+function categoryKindOf(files: FileMap, path: string): "income" | "expense" {
+  try {
+    return flattenCategories(readCats(files)).map.get(path)?.kind === "income" ? "income" : "expense";
+  } catch {
+    return "expense";
+  }
 }
 
 export function voidTransaction(files: FileMap, id: string, reason?: string, meta?: WriteMeta): Planned {

@@ -166,6 +166,9 @@ export function amountOf(text: string): Amount | null {
 /** A cell that starts with a date. */
 const STARTS_WITH_DATE = /^(\d{1,2}[/.-]\d{1,2}([/.-](\d{4}|\d{2}))?|\d{4}[/.-]\d{1,2}[/.-]\d{1,2})(?![\d])/;
 
+/** A period line ("21/06/2025 - 20/07/2025", "01/06/2025 đến 30/06/2025"): a statement's header, never a row. */
+const DATE_RANGE_RE = /\d{1,2}[/.]\d{1,2}[/.]\d{2,4}\s*(?:-|–|~|to|den)\s*\d{1,2}[/.]\d{1,2}[/.]\d{2,4}/;
+
 const hasWord = (text: string, words: string[]) => {
   const p = plain(text);
   return words.some((w) => {
@@ -260,7 +263,7 @@ export function parseStatement(lines: Line[], period: { from: ISODate; close: IS
     const date = head[0];
     if (!date || date < lo || date > hi) return;
     const text = l.map((c) => c.text).join(" ");
-    if (hasWord(text, skips)) return;
+    if (hasWord(text, skips) || DATE_RANGE_RE.test(plain(text))) return;
     const amounts: { cell: Cell; a: Amount }[] = [];
     const desc: string[] = [];
     for (const c of l) {

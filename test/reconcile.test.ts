@@ -137,8 +137,9 @@ describe("statement rows: general rules", () => {
     expect(p.closing).toBe(4211082);
     expect(p.rows.map((r) => [r.date, r.amount])).toEqual([["2025-08-03", -33300], ["2025-08-05", 0 - 262000], ["2025-08-27", -909], ["2025-08-21", 5379500]]);
   });
-  it("a description wrapped onto the lines around the row; CR before the amount; the currency column is not the description", () => {
+  it("a description wrapped onto the lines around the row; CR before the amount; the currency column is not the description; the period line is not a row", () => {
     const lines = linesFromText([
+      "21/06/2025 - 20/07/2025   100,000",
       "Retail VNM Q PHU NHUAN",
       "21/06/25  24/06/25  -722,520.00  VND  722,520.00",
       "MPOS*HARU SUSHI",
