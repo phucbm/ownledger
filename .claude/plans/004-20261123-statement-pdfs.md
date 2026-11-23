@@ -1,6 +1,6 @@
 # 004: Bank statements: collect from Gmail, open in the dashboard, check transactions
 
-Written: 2026-11-23. Status: In progress (2.1.0 released; step 7 open)
+Written: 2026-11-23. Status: Done 2026-11-23
 Related: plan 002 (cards, statement periods), plan 003 (dashboard)
 
 ## Goal
@@ -134,4 +134,8 @@ locked with a made-up password), never real statements.
 - Open (step 7): collect one more bank end to end with an agent (new folders kbank, msb-mdigi, msb-vs, vib-familylink
   are in the owner's working copy, untracked, made outside this run), deploy `my-money` on 2.1.0, look at the link
   in the dashboard.
+- 2026-11-23 Step 7: `my-money` on ownledger 2.1.0 (`npm i`, `check` ok), deployed (`ownledger deploy`, Worker answers;
+  the live PDF route answers 401 without sign-in). The owner filed KBank, MSB, VIB, HSBC and Techcombank statements
+  themselves, already pushed. Left to the owner: look at the "Sao kê PDF" link in the dashboard; commit the
+  `package.json`/`package-lock.json` bump in `my-money` (left uncommitted).
 
