@@ -32,7 +32,7 @@ const fail = (msg: string): Result => ({ content: [{ type: "text", text: msg }],
 
 const INSTRUCTIONS = `ownledger: the owner's personal finance ledger, kept in their private GitHub repo.
 Amounts are whole numbers in the base currency (see about). Answers are computed here; never add up raw rows yourself when a tool computes it.
-Writes: the add_/edit_/void_/set_/remove_ tools only PREVIEW. Show the owner the preview (what, amounts, accounts), wait for their explicit go, then call apply with the preview_id. Never invent an amount, date, account or category: ask. Call rules once before the first write.
+Writes: the add_/edit_/void_/set_/remove_ tools and batch only PREVIEW. Show the owner the preview (what, amounts, accounts), wait for their explicit go, then call apply with the preview_id. Never invent an amount, date, account or category: ask. Call rules once before the first write. For more than ~3 transaction writes at once, use batch: one preview, one go, one commit.
 Dashboard: when the owner asks to "track", "watch" or "put on my dashboard" something, offer a widget (add_widget), using the categories and accounts from rules.
 Cards: for "which card should I use", call best_card; statements, cashback and fee waivers come from cards and card_statement.`;
 const OPENWALLET_LINE = `
@@ -110,17 +110,21 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
       }
     };
 
-  const preview = async (build: (files: Record<string, string>) => A.Planned) => {
+  const preview = async (build: (files: Record<string, string>) => A.Planned, show = 20) => {
     const s = await snap();
     const p = build(s.files);
     const id = await savePending(env, { baseSha: s.sha, files: p.files, message: p.message, summary: p.summary, created: new Date().toISOString() });
     const shown: unknown[] = [];
-    for (const t of [...(p.change.addTransactions ?? []), ...(p.change.replaceTransactions ?? [])].slice(0, 20)) shown.push(compactTx(t));
+    const all = [...(p.change.addTransactions ?? []), ...(p.change.replaceTransactions ?? [])];
+    for (const t of all.slice(0, show)) shown.push(compactTx(t));
+    const b = p as Partial<A.BatchPlanned>;
     return {
       preview_id: id,
       will: p.summary,
       commit_message: p.message,
       ...(shown.length ? { transactions: shown } : {}),
+      ...(all.length > shown.length ? { not_shown: all.length - shown.length } : {}),
+      ...(b.balanceChange ? { balance_change: b.balanceChange } : {}),
       ...(p.warnings.length ? { warnings: p.warnings.map((w) => w.message) } : {}),
       next: "Show this to the owner. Only after their explicit go, call apply with this preview_id.",
     };
@@ -397,6 +401,32 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
     "void_transaction",
     { description: "PREVIEW voiding a transaction (kept in history, excluded everywhere).", inputSchema: z.object({ id: z.string(), reason }), annotations: pv },
     wrap(async ({ id, reason }) => preview((f) => A.voidTransaction(f, id, reason, meta(reason)))),
+  );
+
+  const batchOp = z.object(txFields).partial().extend({
+    op: z.enum(["add", "edit", "void"]),
+    id: z.string().optional().describe("edit / void: the transaction id"),
+    reason: z.string().trim().max(A.REASON_MAX).optional().describe("optional: this op's own reason, added to the batch's"),
+  });
+
+  server.registerTool(
+    "batch",
+    {
+      description: `PREVIEW many adds, edits and voids as ONE change (writes nothing): one preview, one go, one commit. Use it for more than ~3 writes (e.g. fixes from a statement check). Each op takes the same fields as add_transaction / edit_transaction / void_transaction plus op. Ops run in order; if any op fails, the whole batch is refused and the reply names the op. Max ${A.BATCH_MAX} ops.`,
+      inputSchema: z.object({ ops: z.array(batchOp).min(1).max(A.BATCH_MAX), reason }),
+      annotations: pv,
+    },
+    wrap(async ({ ops, reason }) => {
+      const s = await snap();
+      const p = poolOf(s.ledger, dashboardOf(s.files, props.login)?.prefs?.pool, now());
+      const list = ops.map((o, i) => {
+        if (o.op !== "add" && !o.id) throw new A.ActionError(`batch refused: op ${i + 1} (${o.op}) needs an id`);
+        if (o.op === "add" && !o.date) throw new A.ActionError(`batch refused: op ${i + 1} (add) needs a date`);
+        if (o.op === "add" && !o.lines?.length && !o.account && p.on && p.default_account) return { ...o, account: p.default_account };
+        return o;
+      }) as A.BatchOp[];
+      return preview((f) => A.batch(f, list, meta(reason)), A.BATCH_MAX);
+    }),
   );
 
   const accountFields = {

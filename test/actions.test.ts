@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  ActionError, addAccount, addCategory, addPlan, addPrice, addTransaction, checkFiles, editAccount, editCategory, editTransaction,
+  ActionError, addAccount, batch, addCategory, addPlan, addPrice, addTransaction, checkFiles, editAccount, editCategory, editTransaction,
   holdingsAt, voidTransaction, type FileMap,
 } from "../src/engine/index.js";
 import { readDataDir } from "../src/node/files.js";
@@ -88,5 +88,51 @@ describe("actions", () => {
     expect(after(demo, a.files).transactions.find((t) => t.note === "Plain")!.trail).toBeUndefined();
     const bad = a.files["data/ledger/2026/11.jsonl"]!.replace('"note":"Plain"', '"note":"Plain","trail":[{"op":"add"}]');
     expect(checkFiles({ ...demo, "data/ledger/2026/11.jsonl": bad }).errors.some((x) => /trail entry/.test(x.message))).toBe(true);
+  });
+  it("batch: mixed ops in one change, ops see earlier ops, one commit message, balance change", () => {
+    const m = { via: "mcp", client: "Claude", at: "2026-11-23T01:00:00Z", reason: "Woori statement check" };
+    const base = addTransaction(demo, { date: "2026-10-05", kind: "expense", amount: 50000, account: "cash", category: "food", note: "Old" });
+    const files = { ...demo, ...base.files };
+    const oldId = after(demo, base.files).transactions.find((t) => t.note === "Old")!.id;
+    const other = addTransaction(files, { date: "2026-10-06", kind: "expense", amount: 70000, account: "cash", category: "food", note: "Dup" });
+    const f2 = { ...files, ...other.files };
+    const dupId = after(files, other.files).transactions.find((t) => t.note === "Dup")!.id;
+    const b = batch(f2, [
+      { op: "add", date: "2026-11-03", kind: "expense", amount: 9091, account: "card-visa", category: "food", note: "Fee" },
+      { op: "add", date: "2026-11-03", kind: "expense", amount: 909, account: "card-visa", category: "food", note: "Fee VAT", reason: "VAT row" },
+      { op: "edit", id: oldId, amount: 60000, date: "2026-11-01" },
+      { op: "void", id: dupId, reason: "duplicate" },
+    ], m);
+    expect(b.counts).toEqual({ add: 2, edit: 1, void: 1 });
+    expect(b.message).toBe("Batch: 2 adds, 1 edit, 1 void\n\nReason: Woori statement check\nVia: mcp (Claude)");
+    expect(Object.keys(b.files).sort()).toEqual(["data/ledger/2026/10.jsonl", "data/ledger/2026/11.jsonl"]);
+    expect(b.balanceChange).toEqual({ "card-visa": -10000, cash: -60000 + 50000 + 70000 });
+    const l = after(f2, b.files);
+    expect(l.transactions.find((t) => t.note === "Fee VAT")!.trail).toEqual([{ op: "add", at: m.at, via: "mcp", client: "Claude", reason: "Woori statement check; VAT row" }]);
+    expect(l.transactions.find((t) => t.id === dupId)!.void_reason).toBe("duplicate");
+    expect(l.transactions.find((t) => t.id === oldId)!.date).toBe("2026-11-01");
+    expect(b.change.addTransactions!.length).toBe(2);
+    expect(b.change.replaceTransactions!.length).toBe(2);
+  });
+  it("batch: two ops on the same row show as one replace with the final version", () => {
+    const base = addTransaction(demo, { date: "2026-10-05", kind: "expense", amount: 50000, account: "cash", category: "food", note: "Twice" });
+    const files = { ...demo, ...base.files };
+    const id = base.change.addTransactions![0]!.id;
+    const b = batch(files, [{ op: "edit", id, amount: 40000 }, { op: "void", id, reason: "wrong" }]);
+    expect(b.change.replaceTransactions!.length).toBe(1);
+    expect(b.change.replaceTransactions![0]!.void).toBe(true);
+    expect(b.balanceChange).toEqual({ cash: 50000 });
+  });
+  it("batch: one failing op refuses everything and says which; check runs on the final files", () => {
+    expect(() => batch(demo, [
+      { op: "add", date: "2026-11-03", kind: "expense", amount: 1000, account: "cash", category: "food" },
+      { op: "add", date: "2026-11-03", kind: "expense", amount: 1000, account: "nope-acc", category: "food" },
+    ])).toThrow(/would not pass check/);
+    expect(() => batch(demo, [
+      { op: "add", date: "2026-11-03", kind: "expense", amount: 1000, account: "cash", category: "food" },
+      { op: "void", id: "t_missing" },
+    ])).toThrow(/op 2 \(void t_missing\) failed: no transaction t_missing/);
+    expect(() => batch(demo, [])).toThrow(/no ops/);
+    expect(() => batch(demo, Array.from({ length: 201 }, () => ({ op: "void" as const, id: "x" })))).toThrow(/at most 200/);
   });
 });
