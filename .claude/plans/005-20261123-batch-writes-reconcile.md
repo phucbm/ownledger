@@ -7,10 +7,11 @@ Related: plan 004 (statement PDFs, `ownledger statements check`), plan 002 (card
 
 - Done: all infra. 2.2.0 (batch, statements reconcile) and 2.3.0 (batch op `statement_amount`) are released and deployed to my-money. The live connector reports 2.3.0, check has 0 errors.
 - Open: data fixes in my-money, in their own session (owner, 2026-11-23: "not the job here, get the infra ready! we will run those in other session"):
-  1. KBank: about 50 statement rows missing on the ledger (mostly DCC VAT and FX-markup VAT, plus a few purchases). `npx ownledger statements reconcile kbank --json`, then fill in categories and apply as one `batch`.
+  1. KBank (card cancelled, owner 2026-11-23, so it should close at 0): batch applied 2026-11-23 in my-money `65ba766` (not pushed), run locally through the engine's `batch()` since the connector didn't offer `batch`: 35 fees, 6 purchases, 2 cashbacks, 5 amounts set to the statement, 4 rows moved to kbank. Left, waiting on the owner: the 2026-04-05 payment of 276,003 into the card and the −480,828 adjustment `t_0826e72246dd60` the same day; Google One 2026-03-03, +85,890 on the statement vs −85,890 in the ledger (read the PDF first); GS25 58,000 on 2025-12-08 is on the statement but "Cf" 120,000 the same day isn't; fuel 85,000 on 2025-09-25 isn't on the statement. Ledger 2026-03 is 318,780 above the bank.
+     Engine bug found: editing only `amount` on a 0-amount row reads it as income (`kind` from the sign of 0), so the account gets +amount. Workaround: pass `kind`. Fix in ownledger: take the kind from the category's side (expense/income) when the amount is 0.
   2. MSB (`msb-mdigi`): the closing figures have no labels. Read them off each PDF and save them as `statement_amount` ops in one batch.
   3. Woori: one account, two cards over time (Platinum ****1926, then downgraded to Gold ****1435; owner, 2026-11-23). The 2026-01 file stays. Reconcile lists the 2026-01-06 payment of 1,244,648 from cash as on no statement: check the old card's statement before changing anything.
-- Next step: start item 1 (KBank) in a new chat, so the connector shows the `batch` tool.
+- Next step: finish KBank's open items with the owner, then 2 (MSB) and 3 (Woori). The Money connector in claude.ai still shows no `batch` tool (2026-11-23): reconnect it, or keep running batches locally.
 
 ## Goal
 
