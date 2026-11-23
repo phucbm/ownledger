@@ -4,30 +4,11 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { appJwt, pemToPkcs8 } from "../src/worker/github.js";
-import { untar } from "../src/worker/tar.js";
+import { appJwt, filesAt, pemToPkcs8 } from "../src/worker/github.js";
 import { startDataServer } from "../src/cli/dev.js";
 import { STATEMENT_PDF_RE } from "../src/modules/cards/files.js";
 
 describe("worker helpers", () => {
-  it("untar reads a gzipped tarball like GitHub's (top folder stripped, long names, filter)", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ol-tar-"));
-    const top = join(dir, "owner-repo-abc1234");
-    const long = "data/ledger/2026/" + "x".repeat(120) + ".txt";
-    for (const [p, c] of [["data/meta.yaml", "format: 1\n"], ["data/ledger/2026/11.jsonl", '{"id":"t1"}\n'], ["README.md", "hi"], [long, "long name"], ["data/vi.yaml", "Ăn uống ☕"]] as const) {
-      mkdirSync(join(top, p, ".."), { recursive: true });
-      writeFileSync(join(top, p), c);
-    }
-    const tgz = join(dir, "x.tgz");
-    execFileSync("tar", ["--format=pax", "-czf", tgz, "-C", dir, "owner-repo-abc1234"], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
-    const bytes = new Uint8Array(readFileSync(tgz));
-    const stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream("gzip"));
-    const files = await untar(stream as ReadableStream<Uint8Array>, (p) => p.startsWith("data/"));
-    expect(Object.keys(files).sort()).toEqual(["data/ledger/2026/11.jsonl", long, "data/meta.yaml", "data/vi.yaml"].sort());
-    expect(files["data/vi.yaml"]).toBe("Ăn uống ☕");
-    expect(files[long]).toBe("long name");
-  });
-
   it("GitHub App JWT from a PKCS#1 key (what GitHub hands out) verifies with the public key", async () => {
     const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
     const pem1 = privateKey.export({ type: "pkcs1", format: "pem" }).toString();
@@ -40,18 +21,53 @@ describe("worker helpers", () => {
     expect(verify("sha256", Buffer.from(`${h}.${b}`), publicKey, Buffer.from(s!, "base64url"))).toBe(true);
   });
 
-  it("untar lists statement PDFs by path only, without their bytes", async () => {
-    const dir = mkdtempSync(join(tmpdir(), "ol-tar-"));
-    const top = join(dir, "owner-repo-abc1234");
-    for (const [p, c] of [["data/meta.yaml", "format: 1\n"], ["imports/statements/card/2026-10.pdf", "%PDF made up"], ["imports/statements/card/notes.txt", "x"], ["imports/raw/20261101-x.csv", "a,b"]] as const) {
-      mkdirSync(join(top, p, ".."), { recursive: true });
-      writeFileSync(join(top, p), c);
+  it("filesAt reads data files by tree + GraphQL (no tarball): PDFs by path only, batches of 100, raw fallback when truncated", async () => {
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const pem = privateKey.export({ type: "pkcs1", format: "pem" }).toString();
+    const tree = [
+      { path: "data", type: "tree", sha: "d0" },
+      { path: "data/meta.yaml", type: "blob", sha: "m1" },
+      { path: "data/big.jsonl", type: "blob", sha: "big" },
+      ...Array.from({ length: 120 }, (_, i) => ({ path: `data/ledger/x${i}.jsonl`, type: "blob", sha: `l${i}` })),
+      { path: "imports/misa.mapping.yaml", type: "blob", sha: "map" },
+      { path: "imports/statements/card/2026-10.pdf", type: "blob", sha: "pdf" },
+      { path: "imports/statements/card/notes.txt", type: "blob", sha: "n" },
+      { path: "imports/raw/20261101-x.xlsx", type: "blob", sha: "raw" },
+      { path: "README.md", type: "blob", sha: "r" },
+    ];
+    const text = (sha: string) => (sha === "m1" ? "format: 1\nname: Ăn uống ☕\n" : `text of ${sha}`);
+    const calls: string[] = [];
+    const real = globalThis.fetch;
+    globalThis.fetch = (async (input: string, init?: RequestInit) => {
+      const url = String(input);
+      calls.push(`${init?.method ?? "GET"} ${url.replace("https://api.github.com", "")}`);
+      const j = (v: unknown) => new Response(JSON.stringify(v), { status: 200 });
+      if (url.endsWith("/installation")) return j({ id: 7 });
+      if (url.endsWith("/access_tokens")) return j({ token: "t", expires_at: new Date(Date.now() + 3600_000).toISOString() });
+      if (url.includes("/git/trees/")) return j({ tree, truncated: false });
+      if (url.endsWith("/graphql")) {
+        const q = JSON.parse(String(init!.body)) as { query: string };
+        const repo: Record<string, unknown> = {};
+        for (const m of q.query.matchAll(/(f\d+): object\(oid: "([^"]+)"\)/g)) repo[m[1]!] = m[2] === "big" ? { text: "cut", isTruncated: true } : { text: text(m[2]!), isTruncated: false };
+        return j({ data: { repository: repo } });
+      }
+      if (url.endsWith("/git/blobs/big")) return new Response("the whole big file", { status: 200 });
+      return new Response("unexpected", { status: 500 });
+    }) as typeof fetch;
+    try {
+      const files = await filesAt({ appId: "1", privateKey: pem, repo: "o/r", branch: "main" }, "abc");
+      expect(Object.keys(files).length).toBe(124);
+      expect(files["data/meta.yaml"]).toBe("format: 1\nname: Ăn uống ☕\n");
+      expect(files["data/big.jsonl"]).toBe("the whole big file");
+      expect(files["imports/misa.mapping.yaml"]).toBe("text of map");
+      expect(files["imports/statements/card/2026-10.pdf"]).toBe("");
+      expect(files["imports/raw/20261101-x.xlsx"]).toBeUndefined();
+      expect(files["README.md"]).toBeUndefined();
+      expect(calls.filter((c) => c.endsWith("/graphql"))).toHaveLength(2);
+      expect(calls.some((c) => c.includes("tarball") || c.includes("/pdf") || c.includes("/raw"))).toBe(false);
+    } finally {
+      globalThis.fetch = real;
     }
-    const tgz = join(dir, "x.tgz");
-    execFileSync("tar", ["--format=pax", "-czf", tgz, "-C", dir, "owner-repo-abc1234"], { env: { ...process.env, COPYFILE_DISABLE: "1" } });
-    const stream = new Blob([new Uint8Array(readFileSync(tgz))]).stream().pipeThrough(new DecompressionStream("gzip"));
-    const files = await untar(stream as ReadableStream<Uint8Array>, (p) => p.startsWith("data/"), (p) => STATEMENT_PDF_RE.test(p));
-    expect(files).toEqual({ "data/meta.yaml": "format: 1\n", "imports/statements/card/2026-10.pdf": "" });
   });
 
   it("ownledger dev's data server lists statement PDFs by path and serves only those", async () => {

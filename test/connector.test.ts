@@ -203,3 +203,21 @@ describe("statement PDFs (plan 004)", () => {
     expect((await w.raw("m/cards/statement-pdf?account=card&close=2026-11-05&date=2026-11-23")).status).toBe(401);
   });
 });
+
+describe("dashboard API: data repo load fails", () => {
+  it("answers JSON with the reason (not a bare 500 the dashboard can't explain)", async () => {
+    const env = { DEV_DATA_URL: "memory", DEV_LOGIN: "phuc", ALLOWED_LOGINS: "phuc", TIMEZONE: "Asia/Ho_Chi_Minh" } as unknown as Env;
+    const src: DataSource = {
+      label: "github.com/o/r@main",
+      head: async () => "abc",
+      files: async () => {
+        throw new Error("GitHub list the data repo's files: 404");
+      },
+      blob: async () => null,
+      commit: async () => "x",
+    };
+    const res = await api(new Request("http://localhost/api/me"), env, src);
+    expect(res.status).toBe(502);
+    expect(await res.json()).toEqual({ error: "could not load the data repo (github.com/o/r@main): GitHub list the data repo's files: 404" });
+  });
+});
