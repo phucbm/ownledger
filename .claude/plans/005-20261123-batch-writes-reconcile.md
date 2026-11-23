@@ -76,6 +76,8 @@ Statement text is read only on the user's computer; the Worker still talks only 
   - `kbank`: the closing figures read, gaps are real (mostly DCC VAT and FX markup VAT rows not on the ledger). Fixes prepared for the owner as one batch (needs categories and the owner's go).
   - `msb-mdigi`: rows read (CR before the amount, descriptions wrapped onto the lines around the row); MSB prints its closing figures without text labels, so no closing figure is found. Use `add_statement_amount` or a later layout field.
 
+- Follow-up the same day: 2.3.0 adds the `batch` op `statement_amount`, for MSB's unlabelled closing figures (one batch, not 18 previews). Deployed to my-money. The data fixes (KBank rows, MSB figures) are left for a separate session, as the owner asked.
+
 ## Decisions made during the run
 
 - **Timing is computed, not guessed:** per month, the part of the gap from matched rows that the bank and the ledger put on different sides of a close date ("of which timing"). A month is "timing only" when that explains the whole gap.
