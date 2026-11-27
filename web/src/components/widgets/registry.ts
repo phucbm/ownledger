@@ -1,4 +1,4 @@
-import { ArrowDownUp, BadgePercent, BellRing, CalendarClock, ChartLine, ChartPie, Coins, CreditCard, Gauge, Landmark, PiggyBank, Receipt, Scale, Wallet, WandSparkles, Zap, type LucideIcon } from "lucide-react";
+import { ArrowDownUp, BadgePercent, BellRing, CalendarClock, ChartLine, ChartPie, Coins, CreditCard, Gauge, Landmark, PiggyBank, Receipt, Scale, Target, Wallet, WandSparkles, Zap, type LucideIcon } from "lucide-react";
 import { lazy, type ComponentType } from "react";
 import type { Features, Widget } from "@/lib/types";
 import type { WidgetProps } from "./shared";
@@ -29,6 +29,7 @@ export interface WidgetDef {
 const Account = lazy(() => import("./Account"));
 const Cards = lazy(() => import("./Cards"));
 const Cashback = lazy(() => import("./Cashback"));
+const CardBudgets = lazy(() => import("./CardBudgets"));
 const CardsValue = lazy(() => import("./CardsValue"));
 const WhichCard = lazy(() => import("./WhichCard"));
 const Attention = lazy(() => import("./Attention"));
@@ -62,6 +63,7 @@ export const widgetRegistry: Record<string, WidgetDef> = Object.fromEntries(
       { type: "deposits", icon: PiggyBank, hue: "money", titleKey: "widget.deposits", component: Deposits, size: { w: 6, h: 3 }, min: { w: 3, h: 2 }, available: (f) => Boolean(f?.deposits) },
       { type: "chart", icon: ChartLine, hue: "time", titleKey: "widget.chart", component: ChartWidget, options: ["query", "chart", "title"], size: { w: 6, h: 4 }, min: { w: 3, h: 2 } },
       { type: "cards", icon: CreditCard, hue: "cards", titleKey: "widget.cards", component: Cards, size: { w: 6, h: 5 }, min: { w: 3, h: 3 }, available: cards },
+      { type: "card_budgets", icon: Target, hue: "cards", titleKey: "widget.card_budgets", component: CardBudgets, size: { w: 6, h: 5 }, min: { w: 3, h: 3 }, available: cards },
       { type: "cashback", icon: BadgePercent, hue: "money", titleKey: "widget.cashback", component: Cashback, size: { w: 6, h: 4 }, min: { w: 3, h: 3 }, available: cards },
       { type: "which_card", icon: WandSparkles, hue: "cards", titleKey: "widget.which_card", component: WhichCard, size: { w: 6, h: 4 }, min: { w: 3, h: 3 }, available: cards },
       { type: "cards_value", icon: Scale, hue: "cards", titleKey: "widget.cards_value", component: CardsValue, size: { w: 6, h: 4 }, min: { w: 3, h: 3 }, available: cards },

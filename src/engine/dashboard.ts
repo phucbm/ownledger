@@ -28,6 +28,7 @@ export const WIDGET_TYPES: Record<string, { module?: string; options?: string[] 
   chart: { options: ["query", "chart", "title"] },
   cards: { module: "cards" },
   cashback: { module: "cards" },
+  card_budgets: { module: "cards" },
   which_card: { module: "cards" },
   cards_value: { module: "cards" },
   deposits: { module: "deposits" },

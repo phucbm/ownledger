@@ -655,7 +655,7 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
   server.registerTool(
     "add_widget",
     {
-      description: "PREVIEW adding a widget to the owner's dashboard: a chart from a query (type chart), or a built-in widget by type (pace, left, attention, unusual, net_worth, by_category, income_spending, recent, account, upcoming, cards, cashback, which_card, cards_value, deposits). Shows the first numbers so the owner can see it's right.",
+      description: "PREVIEW adding a widget to the owner's dashboard: a chart from a query (type chart), or a built-in widget by type (pace, left, attention, unusual, net_worth, by_category, income_spending, recent, account, upcoming, cards, card_budgets (each card's cashback room per group and last safe day), cashback, which_card, cards_value, deposits). Shows the first numbers so the owner can see it's right.",
       inputSchema: z.object({ type: z.string().default("chart"), title: z.string().max(80).optional(), query: queryShape.optional(), chart: z.enum(["stat", "line", "bar", "hbar", "table"]).optional(), account: z.string().optional(), period: z.string().optional(), w: z.number().int().min(1).max(12).optional(), h: z.number().int().min(1).max(24).optional(), id: z.string().optional() }),
       annotations: pv,
     },

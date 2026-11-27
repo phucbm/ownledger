@@ -96,6 +96,8 @@ describe("connector: AI-built widgets", () => {
     const w = world();
     await expect(w.call("add_widget", { type: "chart", query: { metric: "balance", period: "fortnight" } })).rejects.toThrow(/period/);
     await expect(w.call("add_widget", { type: "nope" })).rejects.toThrow(/unknown widget type/);
+    const cb = await w.call("add_widget", { type: "card_budgets" });
+    expect(cb.preview_id).toBeTruthy();
   });
 });
 

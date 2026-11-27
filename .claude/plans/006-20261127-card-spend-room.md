@@ -11,7 +11,9 @@ Related: plan 002 (cards period, cashback terms, OpenWallet), `src/modules/cards
   - "Copy OpenWallet's terms" is a read-only tool `card_terms_from_openwallet` (registered only with OpenWallet on). It returns a `details.cashback` suggestion with empty categories for the owner to map, plus notes (one active group, points). Saving goes through `set_card_details` as usual.
   - Rule caps count per statement (a `per: month` on a rule cap is read as its amount).
 - Owner's answers 2026-11-27: MSB's chosen group is **dining**. Woori: how points turn into money is unknown, and OpenWallet doesn't say either (its `rewards` is in `no_data_for`). Ask again in the data step.
-- Next: phase 4 (release) on the owner's go.
+- Owner, 2026-11-27: "dash should allow to access budgets quickly" → new home widget `card_budgets` ("Card budgets" / "Ngân sách thẻ"). It shows every card with a statement day and cashback terms, the soonest safe day first, a bar per capped group with the room left, minimum still missing, and points ready. Can be added with add_widget or in edit mode.
+- Owner, 2026-11-27: MSB cash-ins take up to 3 months to arrive, so a high points balance in the ledger is expected. Don't flag it.
+- Next: phase 4 (release) on the owner's go; then add the widget to the owner's home.
 
 ## Goal
 
