@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { checkFiles } from "../src/engine/index.js";
 import { readDataDir } from "../src/node/files.js";
-import { bestCard, clearSearchCache } from "../src/worker/bestcard.js";
+import { bestCard, clearSearchCache, termsFromOpenWallet } from "../src/worker/bestcard.js";
 import { OpenWalletError, openWalletClient, type OpenWallet } from "../src/worker/openwallet.js";
 import { connect } from "./mcp-memory.js";
 
@@ -135,6 +135,56 @@ describe("best_card", () => {
     const r = await on.call("best_card", { amount: 300000, kind: "groceries" });
     expect(r.isError).toBe(false);
     expect(r.text).toContain('"source":"openwallet"');
+    await on.close();
+  });
+});
+
+describe("card_terms_from_openwallet", () => {
+  beforeEach(() => clearSearchCache());
+  const getCard = () => ({
+    id: "demo-visa-cashback",
+    url: "https://openwallet.vn/the/demo-visa-cashback",
+    lastChecked: "2026-11-01",
+    checked: true,
+    cashback: {
+      max_active_rules: 1,
+      rules: [
+        { rate: 0.1, cap: { amount: 300000 }, intents: ["dining"], mcc: ["5812"], scope: { channel: "offline" } },
+        { rate: 0.08, cap: { amount: 300000 }, merchants: ["shopee", "tiktok-shop"] },
+        { rate: 0.005, intents: ["all"], cap: { amount: 300000 } },
+      ],
+      global_cap: { amount: 1200000 },
+      redemption: "points_pool",
+      note: "Points from 300.000",
+    },
+  });
+
+  it("shapes OpenWallet's rules like details.cashback, leaves categories to the owner, writes nothing", async () => {
+    const { ow, calls } = fakeOw({ get_card: getCard });
+    const r: any = await termsFromOpenWallet(L, ASOF, ow, "card-visa");
+    expect(calls.find((c) => c.tool === "get_card")!.args).toEqual({ card_id: "demo-visa-cashback", include_quotes: false });
+    expect(r.suggestion.cashback).toEqual({
+      base: 0.5,
+      rules: [
+        { categories: [], rate: 10, cap: 300000, in_store: true, label: "dining" },
+        { merchants: ["shopee", "tiktok shop"], rate: 8, cap: 300000 },
+      ],
+      cap: { amount: 1200000, per: "statement" },
+      payout: "points",
+    });
+    expect(r.to_map[0]).toMatchObject({ rule: 0, intents: ["dining"], mcc: ["5812"] });
+    expect(r.notes.join(" ")).toMatch(/only one group earns at a time/);
+    expect(r.openwallet).toMatchObject({ id: "demo-visa-cashback", lastChecked: "2026-11-01" });
+  });
+
+  it("only registered with OpenWallet on", async () => {
+    const off = await connect({ openwallet: null });
+    expect(await off.tools()).not.toContain("card_terms_from_openwallet");
+    await off.close();
+    const on = await connect({ openwallet: fakeOw({ get_card: getCard }).ow });
+    expect(await on.tools()).toContain("card_terms_from_openwallet");
+    const r = await on.call("card_terms_from_openwallet", { account: "card-visa" });
+    expect(r.isError).toBe(false);
     await on.close();
   });
 });

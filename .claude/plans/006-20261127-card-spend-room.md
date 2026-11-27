@@ -1,7 +1,17 @@
 # 006: Card spending room, last safe day, and the cashback terms real cards use
 
-Written: 2026-11-27. Status: Draft
+Written: 2026-11-27. Status: In progress (phases 1–3 done 2026-11-27; release waits for the owner's go)
 Related: plan 002 (cards period, cashback terms, OpenWallet), `src/modules/cards/`
+
+## Where it stands
+
+- Phases 1–3 done 2026-11-27 (not released). Built as designed, except:
+  - The minimum warning keeps its kind `cashback_min` (old dashboards keep working); it now counts to the safe day, amber at ≤ 7 days and red at ≤ 2. The room warning is the new kind `card_spend_room`.
+  - After the safe day, the period is flagged (`daysLeft` < 0, `best_card` says `nextPeriod`). The room shown stays this period's; next period's room is not computed.
+  - "Copy OpenWallet's terms" is a read-only tool `card_terms_from_openwallet` (registered only with OpenWallet on). It returns a `details.cashback` suggestion with empty categories for the owner to map, plus notes (one active group, points). Saving goes through `set_card_details` as usual.
+  - Rule caps count per statement (a `per: month` on a rule cap is read as its amount).
+- Owner's answers 2026-11-27: MSB's chosen group is **dining**. Woori: how points turn into money is unknown, and OpenWallet doesn't say either (its `rewards` is in `no_data_for`). Ask again in the data step.
+- Next: phase 4 (release) on the owner's go.
 
 ## Goal
 

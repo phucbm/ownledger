@@ -175,6 +175,19 @@ describe("connector: pool and cards", () => {
     const best = await w.call("best_card", { category: "food/cafe", amount: 100000, date: "2026-11-02" });
     expect(best.cards[0]).toMatchObject({ account: "card", rate: 5, earn: 5000, source: "yours" });
   });
+
+  it("set_card_details takes per-rule caps, merchant rules and points; cards shows the groups and the safe day", async () => {
+    const w = world();
+    const p = await w.call("set_card_details", { account: "card", cashback: { rules: [{ categories: ["food"], rate: 10, cap: 300000, in_store: true, label: "food" }, { merchants: ["shopee"], rate: 8, cap: 300000 }], post_margin_days: 2, payout: "points", redeem_min: 300000, expire_months: 12 } });
+    await w.call("apply", { preview_id: p.preview_id });
+    const acc = (parseYaml(w.state.files["data/accounts.yaml"]!) as { id: string; details: Record<string, any> }[]).find((a) => a.id === "card")!;
+    expect(acc.details.cashback).toMatchObject({ post_margin_days: 2, payout: "points", redeem_min: 300000, rules: [{ in_store: true, cap: 300000 }, { merchants: ["shopee"] }] });
+    const list = await w.call("cards", {});
+    const c = (list as any[]).find((x) => x.account === "card");
+    expect(c.cashback.groups.map((g: any) => g.label)).toEqual(["food", "shopee"]);
+    expect(c.cashback.safe_until).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(c.points).toMatchObject({ redeem_min: 300000 });
+  });
 });
 
 describe("API", () => {

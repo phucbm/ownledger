@@ -91,6 +91,32 @@ and earned this statement period, next to your available credit, due date and bu
   this statement period. Never account ids, notes, balances, limits or any other transaction.
 - **Nothing is stored:** your data never holds OpenWallet ids or slugs; cards are looked up by name each time.
   Set `details.product` to the bank's own name for the card (e.g. `MSB Visa Online`) so it is found.
+- **Copy a card's terms once:** `card_terms_from_openwallet` shows OpenWallet's cashback rules shaped like your own
+  terms. You map them to your categories and save them with `set_card_details` (preview, then your go). From then on the
+  card's terms are yours, and turning OpenWallet off changes nothing.
+
+### Card cashback terms
+
+Set on a credit card account (`details.cashback`, or `set_card_details` from chat). Every field is optional:
+
+```yaml
+cashback:
+  base: 0.5                      # % on everything no rule covers
+  cap: { amount: 1200000, per: statement }   # the most the card pays per statement
+  min_spend: { amount: 1000000, per: statement }
+  post_margin_days: 3            # spend at least this many days before the statement date (default 3)
+  payout: points                 # auto (default) or points
+  redeem_min: 300000             # points: cash in from this balance
+  expire_months: 12              # points: they expire this long after their statement
+  rules:
+    - { categories: [food/eating-out], rate: 10, cap: 300000, in_store: true, label: dining }
+    - { merchants: [shopee, lazada], rate: 8, cap: 300000 }   # words in the merchant or note
+```
+
+`cards` then gives, for the open statement, each rule's earnings against its cap, the **room** (how much more spending
+still earns cashback), and the **last safe day** (statement date − `post_margin_days`). A purchase made later may land on
+the next statement. The dashboard warns when a minimum isn't met by the safe day, when room is left in the last 3 days,
+when points can be cashed in, and before points expire.
 
 ## CLI
 

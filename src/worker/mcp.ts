@@ -23,7 +23,7 @@ import { cardList } from "../modules/cards/index.js";
 import { cashback, closeOnOrAfter, feeWaiver, lineKind, nextClose, statements } from "../modules/cards/statements.js";
 import { cardsData, STATEMENTS_FILE, termsOf, recordFor, withBankAmounts } from "../modules/cards/terms.js";
 import { parse as parseYaml } from "yaml";
-import { bestCard } from "./bestcard.js";
+import { bestCard, termsFromOpenWallet } from "./bestcard.js";
 import { openWalletClient, type OpenWallet } from "./openwallet.js";
 
 type Result = { content: { type: "text"; text: string }[]; isError?: boolean };
@@ -34,7 +34,7 @@ const INSTRUCTIONS = `ownledger: the owner's personal finance ledger, kept in th
 Amounts are whole numbers in the base currency (see about). Answers are computed here; never add up raw rows yourself when a tool computes it.
 Writes: the add_/edit_/void_/set_/remove_ tools and batch only PREVIEW. Show the owner the preview (what, amounts, accounts), wait for their explicit go, then call apply with the preview_id. Never invent an amount, date, account or category: ask. Call rules once before the first write. For more than ~3 transaction writes at once, use batch: one preview, one go, one commit.
 Dashboard: when the owner asks to "track", "watch" or "put on my dashboard" something, offer a widget (add_widget), using the categories and accounts from rules.
-Cards: for "which card should I use", call best_card; statements, cashback and fee waivers come from cards and card_statement.`;
+Cards: for "which card should I use", call best_card; statements, cashback and fee waivers come from cards and card_statement. "How much more on each card" / "last day to spend": cards gives each group's room and the last safe day (statement date − the card's post margin). To set a card's cashback terms from OpenWallet, call card_terms_from_openwallet, check them with the owner, then set_card_details.`;
 const OPENWALLET_LINE = `
 best_card also asks OpenWallet (an outside card catalog the owner turned on) for cards without the owner's own cashback terms: give it the amount and a merchant or kind. It gets those cards' product names, the purchase and their spend this period. Quote OpenWallet's figures with its date and link (source: openwallet); unknown is not 0. If a card is in not_matched, say so and how to fix it.`;
 
@@ -295,7 +295,7 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
     }),
   );
 
-  server.registerTool("cards", { description: "Credit cards: owed, limit, last statement (to pay, due, paid or not), cashback this period, this statement period (spent by category, refunds, cashback booked), product name, annual fee waiver, terms still missing.", inputSchema: z.object({ date: z.string().optional(), include_closed: z.boolean().optional() }), annotations: ro }, wrap(async ({ date, include_closed }) => {
+  server.registerTool("cards", { description: "Credit cards: owed, limit, last statement (to pay, due, paid or not), cashback this period (groups with earned / cap / room = more spend still paid for, the last safe day to spend so it lands on this statement), points held, this statement period (spent by category, refunds, cashback booked), product name, annual fee waiver, terms still missing.", inputSchema: z.object({ date: z.string().optional(), include_closed: z.boolean().optional() }), annotations: ro }, wrap(async ({ date, include_closed }) => {
     const s = await snap();
     const asOf = date ?? now();
     const per = new Map(cards(s.ledger, asOf).map((x) => [x.account, x]));
@@ -306,7 +306,17 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
       limit: c.limit ?? (c.limitAtLeast ? `at least ${c.limitAtLeast} (most ever owed; limit not set)` : null),
       last_statement: c.last ? { date: c.last.close, amount_due: c.last.amountDue, paid: c.last.paid, to_pay: c.last.toPay, due: c.last.due, status: c.last.status, ...(c.last.bank !== null ? { bank: c.last.bank, diff: c.last.bankDiff } : {}) } : null,
       this_period: c.current ? { from: c.current.from, purchases: c.current.purchases } : null,
-      cashback: c.cashback ? { spend: c.cashback.spend, expected: c.cashback.expected, cap_left: c.cashback.capLeft, min_met: c.cashback.minMet, need_for_min: c.cashback.needForMin, ...(c.cashback.incomplete ? { note: "some rates not set" } : {}) } : null,
+      cashback: c.cashback
+        ? {
+            spend: c.cashback.spend, expected: c.cashback.expected, cap_left: c.cashback.capLeft, min_met: c.cashback.minMet, need_for_min: c.cashback.needForMin,
+            ...(c.cashback.safeUntil ? { closes_on: c.cashback.closesOn, safe_until: c.cashback.safeUntil, days_left: c.cashback.daysLeft } : {}),
+            ...(c.cashback.groups.some((g) => g.cap !== null) ? { groups: c.cashback.groups.map((g) => ({ label: g.label, rate: g.rate, spend: g.spend, earned: g.earned, cap: g.cap, room: g.room, ...(g.inStore ? { in_store: true } : {}) })) } : {}),
+            ...(c.cashback.roomSpend != null ? { room_spend: c.cashback.roomSpend, ...(c.cashback.roomEstimate ? { room_estimate: true } : {}) } : {}),
+            ...(c.cashback.earnLeft != null ? { earn_left: c.cashback.earnLeft } : {}),
+            ...(c.cashback.incomplete ? { note: "some rates not set" } : {}),
+          }
+        : null,
+      ...(c.points ? { points: { balance: c.points.balance, pending: c.points.pending, redeem_min: c.points.redeemMin, can_redeem: c.points.canRedeem, expiring: c.points.lots.filter((x) => x.expires).slice(0, 3), expired: c.points.expired } } : {}),
       ...(c.bank ? { bank: c.bank } : {}),
       ...(per.get(c.account)?.product ? { product: per.get(c.account)!.product } : {}),
       ...(per.get(c.account) ? { period: (({ from, to, spent, refunds, byCategory, cashback }) => ({ from, to, spent, refunds, by_category: byCategory, cashback_booked: cashback }))(per.get(c.account)!.period) } : {}),
@@ -349,6 +359,23 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
       return bestCard(s.ledger, now(), ow, a);
     }),
   );
+
+  if (ow) {
+    server.registerTool(
+      "card_terms_from_openwallet",
+      {
+        description:
+          "OpenWallet's cashback rules for one of the owner's credit cards, shaped like set_card_details' cashback, to check with the owner before saving (writes nothing). Sends the card's product name and bank to OpenWallet. Map each rule's intents to the owner's categories, then set_card_details.",
+        inputSchema: z.object({ account: z.string() }),
+        annotations: { readOnlyHint: true, openWorldHint: true },
+      },
+      wrap(async ({ account }) => {
+        const s = await snap();
+        return termsFromOpenWallet(s.ledger, now(), ow, account);
+      }),
+    );
+  }
+
 
   server.registerTool("plans_due", { description: "Instalments, loan payments and premiums due in the next N days (and overdue), plus what's left per plan.", inputSchema: z.object({ days: z.number().int().max(366).optional() }), annotations: ro }, wrap(async ({ days }) => {
     const s = await snap();
@@ -507,7 +534,7 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
   server.registerTool(
     "set_card_details",
     {
-      description: "PREVIEW card terms on a credit card account: statement and due days, limit, annual fee and its month, fee waiver target, cashback rules. Only the fields given change; they're kept over codes read from wallet names.",
+      description: "PREVIEW card terms on a credit card account: statement and due days, limit, annual fee and its month, fee waiver target, cashback rules (per-rule caps, merchant rules, in-store, points payout, post margin). Only the fields given change; they're kept over codes read from wallet names.",
       inputSchema: z.object({
         account: z.string(),
         statement_day: z.number().int().min(1).max(31).optional(),
@@ -519,7 +546,18 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
         free_days_max: z.number().int().optional(),
         cashback: z.object({
           base: z.number().min(0).max(100).optional(),
-          rules: z.array(z.object({ categories: z.array(z.string()), rate: z.number().min(0).max(100) })).optional(),
+          rules: z.array(z.object({
+            categories: z.array(z.string()).optional(),
+            merchants: z.array(z.string()).optional().describe("words looked for in the merchant and note, e.g. [shopee, lazada]; wins over categories"),
+            rate: z.number().min(0).max(100),
+            cap: z.number().int().positive().optional().describe("the most this rule pays per statement"),
+            in_store: z.boolean().optional().describe("the bank pays it only for in-store payments"),
+            label: z.string().optional(),
+          })).optional().describe("replaces the card's rules; each needs categories or merchants"),
+          post_margin_days: z.number().int().min(0).max(10).optional().describe("days before the statement date too late to be sure a purchase lands on it (default 3)"),
+          payout: z.enum(["auto", "points"]).optional().describe("auto: the bank pays it; points: a balance cashed in by hand"),
+          redeem_min: z.number().int().positive().optional().describe("points: cash in only from this balance"),
+          expire_months: z.number().int().positive().optional().describe("points: months after their statement that points expire"),
           cap: z.object({ amount: z.number().int().positive(), per: z.enum(["statement", "month"]) }).optional(),
           min_spend: z.object({ amount: z.number().int().positive(), per: z.enum(["statement", "month"]) }).optional(),
           spend_max: z.object({ amount: z.number().int().positive(), per: z.enum(["statement", "month"]) }).optional(),

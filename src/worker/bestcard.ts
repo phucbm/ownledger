@@ -152,7 +152,7 @@ async function openWalletRows(l: Ledger, asOf: ISODate, ow: OpenWallet, mine: Ca
 export async function bestCard(l: Ledger, asOf: ISODate, ow: OpenWallet | null, input: BestCardInput) {
   const date = input.date ?? asOf;
   const amount = input.amount ?? 0;
-  let local: LocalRow[] = localBestCard(l, { category: input.category ?? "", amount, date });
+  let local: LocalRow[] = localBestCard(l, { category: input.category ?? "", amount, date, merchant: input.merchant });
   if (input.accounts?.length) {
     const known = new Set(local.map((r) => r.account));
     const unknown = input.accounts.filter((a) => !known.has(a));
@@ -202,5 +202,66 @@ export async function bestCard(l: Ledger, asOf: ISODate, ow: OpenWallet | null, 
     assumptions,
     ...(fromOw ? { openwallet: { url: ow!.url, catalog: fromOw.catalog, what: fromOw.what } } : {}),
     note: "source says where each cashback figure comes from: yours (your own terms), openwallet (its catalog, quoted with lastChecked or the catalog date), none (unknown, which is not 0).",
+  };
+}
+
+/* ------------------------------------------------------------------ copy OpenWallet's terms (a suggestion, never stored here) */
+
+const pct = (r: unknown) => (typeof r === "number" ? Math.round(r * 10000) / 100 : null);
+
+/**
+ * OpenWallet's cashback rules for one of the owner's cards, shaped like details.cashback, for the owner to check.
+ * Nothing is written: categories are left for the owner to map (OpenWallet's intents and MCCs are hints), and only
+ * after their go does set_card_details save the terms as the owner's own facts (no OpenWallet id in the data).
+ */
+export async function termsFromOpenWallet(l: Ledger, asOf: ISODate, ow: OpenWallet, account: string) {
+  const c = cards(l, asOf).find((x) => x.account === account);
+  if (!c) throw new Error(`${account} is not an open credit card`);
+  const f = await findCard(ow, c);
+  if (!("ow" in f)) return { account, not_matched: f };
+  const card = await ow.call("get_card", { card_id: f.ow.id, include_quotes: false });
+  const cb = card?.cashback ?? null;
+  if (!cb || !Array.isArray(cb.rules) || !cb.rules.length) return { account, openwallet: { id: f.ow.id, name: f.ow.name, url: card?.url ?? f.ow.url ?? null, lastChecked: card?.lastChecked ?? null }, suggestion: null, note: "OpenWallet has no cashback rules for this card." };
+  const rules: Record<string, unknown>[] = [];
+  const toMap: Record<string, unknown>[] = [];
+  let base: number | null = null;
+  const notes: string[] = [];
+  for (const r of cb.rules as any[]) {
+    const rate = pct(r.rate);
+    const intents: string[] = Array.isArray(r.intents) ? r.intents : [];
+    if (intents.includes("all") && !r.merchants?.length) {
+      base = rate;
+      if (r.cap?.amount) notes.push(`the base rate has its own cap of ${r.cap.amount} at OpenWallet; ownledger caps it only through the card's cap`);
+      continue;
+    }
+    const merchants: string[] = Array.isArray(r.merchants) ? r.merchants.map((m: string) => m.replace(/-/g, " ")) : [];
+    const rule: Record<string, unknown> = {
+      ...(merchants.length ? { merchants } : { categories: [] }),
+      rate,
+      ...(r.cap?.amount ? { cap: r.cap.amount } : {}),
+      ...(r.scope?.channel === "offline" ? { in_store: true } : {}),
+      ...(intents.length ? { label: intents.join(", ") } : {}),
+    };
+    rules.push(rule);
+    toMap.push({ rule: rules.length - 1, intents, ...(r.mcc ? { mcc: r.mcc } : {}), ...(r.note ? { note: r.note } : {}), ...(merchants.length ? { merchants_note: "matched in the transaction's merchant or note" } : { categories: "pick the owner's categories (rules tool)" }) });
+  }
+  const payout = cb.redemption === "auto_statement_credit" || cb.redemption === "auto" ? "auto" : "points";
+  if (cb.max_active_rules === 1 && rules.length > 1) notes.push("only one group earns at a time (the owner picks it): keep only the chosen rule");
+  if (payout === "points") notes.push(`paid as points (${cb.redemption ?? "unknown"}): set redeem_min and expire_months if the bank says (see OpenWallet's note)`);
+  const suggestion = {
+    ...(base !== null ? { base } : {}),
+    rules,
+    ...(cb.global_cap?.amount ? { cap: { amount: cb.global_cap.amount, per: "statement" } } : {}),
+    ...(cb.min_spend?.amount ? { min_spend: { amount: cb.min_spend.amount, per: "statement" } } : {}),
+    payout,
+  };
+  return {
+    account,
+    openwallet: { id: f.ow.id, name: f.ow.name, url: card?.url ?? f.ow.url ?? null, lastChecked: card?.lastChecked ?? null, checked: card?.checked ?? null, catalog: card?.catalog ?? null, note: cb.note ?? null },
+    suggestion: { cashback: suggestion },
+    to_map: toMap,
+    notes,
+    next: "Show the owner these terms with OpenWallet's date and link. Map each rule's intents to the owner's categories, fill what OpenWallet doesn't say (redeem_min, expire_months), then set_card_details (a preview) and apply only after their go.",
+    ...(card?.checked === false ? { warning: "OpenWallet has not checked this card against the bank (older data): the owner should confirm each rate and cap." } : {}),
   };
 }
