@@ -1,6 +1,6 @@
 # 006: Card spending room, last safe day, and the cashback terms real cards use
 
-Written: 2026-11-27. Status: In progress (phases 1–3 done 2026-11-27; release waits for the owner's go)
+Written: 2026-11-27. Status: In progress (phases 1–4 done 2026-11-27; phase 5, the data, in its own session)
 Related: plan 002 (cards period, cashback terms, OpenWallet), `src/modules/cards/`
 
 ## Where it stands
@@ -13,7 +13,8 @@ Related: plan 002 (cards period, cashback terms, OpenWallet), `src/modules/cards
 - Owner's answers 2026-11-27: MSB's chosen group is **dining**. Woori: how points turn into money is unknown, and OpenWallet doesn't say either (its `rewards` is in `no_data_for`). Ask again in the data step.
 - Owner, 2026-11-27: "dash should allow to access budgets quickly" → new home widget `card_budgets` ("Card budgets" / "Ngân sách thẻ"). It shows every card with a statement day and cashback terms, the soonest safe day first, a bar per capped group with the room left, minimum still missing, and points ready. Can be added with add_widget or in edit mode.
 - Owner, 2026-11-27: MSB cash-ins take up to 3 months to arrive, so a high points balance in the ledger is expected. Don't flag it.
-- Next: phase 4 (release) on the owner's go; then add the widget to the owner's home.
+- 2.4.0 released 2026-11-27 on the owner's go, my-money bumped (`4f3299e`) and deployed; the live connector reports 2.4.0, check 0 errors. Card budgets widget added to the owner's home (my-money `6928644`, owner's go).
+- Next: phase 5 (data session, local): save `details.cashback` for sacom-uniq, msb-mdigi (dining), woori-gold. Use card_terms_from_openwallet as a start, and get the owner's go on each.
 
 ## Goal
 
