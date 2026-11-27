@@ -1,6 +1,6 @@
 # 006: Card spending room, last safe day, and the cashback terms real cards use
 
-Written: 2026-11-27. Status: In progress (phases 1–4 done 2026-11-27; phase 5, the data, in its own session)
+Written: 2026-11-27. Status: Done 2026-11-27 (2.4.1 deployed; terms saved for the 3 main cards)
 Related: plan 002 (cards period, cashback terms, OpenWallet), `src/modules/cards/`
 
 ## Where it stands
@@ -14,7 +14,10 @@ Related: plan 002 (cards period, cashback terms, OpenWallet), `src/modules/cards
 - Owner, 2026-11-27: "dash should allow to access budgets quickly" → new home widget `card_budgets` ("Card budgets" / "Ngân sách thẻ"). It shows every card with a statement day and cashback terms, the soonest safe day first, a bar per capped group with the room left, minimum still missing, and points ready. Can be added with add_widget or in edit mode.
 - Owner, 2026-11-27: MSB cash-ins take up to 3 months to arrive, so a high points balance in the ledger is expected. Don't flag it.
 - 2.4.0 released 2026-11-27 on the owner's go, my-money bumped (`4f3299e`) and deployed; the live connector reports 2.4.0, check 0 errors. Card budgets widget added to the owner's home (my-money `6928644`, owner's go).
-- Next: phase 5 (data session, local): save `details.cashback` for sacom-uniq, msb-mdigi (dining), woori-gold. Use card_terms_from_openwallet as a start, and get the owner's go on each.
+- 2.4.1 (2026-11-27): the widget was empty because no card had cashback terms. Card budgets now lists every card with a statement day (the safe day doesn't need terms), and `cards` gives `safe_until` for all. Deployed, live 2.4.1.
+- Phase 5 done 2026-11-27, my-money `7f58ce0` (owner's go): sacom-uniq (20% groceries + rides, cap 300k; 0.5% base; card cap 600k; owner confirmed the old OpenWallet data), msb-mdigi (dining incl. cafés 20%, cap 300k, points from 300k, 12 months), woori-gold (marketplaces 8%, dining incl. cafés 10% in store, groceries 5% in store, travel 5%, each 300k; card cap 1.2tr; points). Saved locally through the engine's editAccount.
+- Left for later: terms for the other cards (sacom-cashback, msb-vs, vib, hsbc, uob) when the owner wants them.
+- Was next: phase 5 (data session, local): save `details.cashback` for sacom-uniq, msb-mdigi (dining), woori-gold. Use card_terms_from_openwallet as a start, and get the owner's go on each.
 
 ## Goal
 
