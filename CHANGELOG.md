@@ -1,5 +1,26 @@
 # Changelog
 
+## 2.4.0 (2026-11-27)
+
+Card spending room and the last safe day (plan 006). Data format stays 1; every new field is optional.
+
+- **Cashback terms like real cards:** a rule can have its own `cap` (on top of the card's), `merchants` (words looked
+  for in the merchant or note, e.g. `[shopee, lazada]`; a merchant rule wins over a category rule), `in_store` (a
+  reminder: the bank pays it only in store) and a `label`. The card takes `post_margin_days` (default 3), and
+  `payout: points` with `redeem_min` and `expire_months`.
+- **Room and the last safe day:** for the open statement, each rule's earnings against its cap and the room left (more
+  spending that still earns cashback, trimmed by the card's cap), and the last safe day to spend (statement date −
+  `post_margin_days`).
+- **Warnings:** the cashback minimum is counted to the safe day (amber, red in the last 2 days). New: room left in the
+  last 3 days (`card_spend_room`), points ready to cash in (`card_points_redeem`), points expiring within 30 days
+  (`card_points_expiring`). Points cards no longer raise "cashback not received".
+- **Connector:** `cards` gives groups, room, safe day and points. `best_card` uses merchant rules and the group's cap
+  left, and says "in store only" or "may post on the next statement". `set_card_details` takes the new fields. New
+  `card_terms_from_openwallet` (only with OpenWallet on) shows OpenWallet's rules for a card shaped like your terms, to
+  check and save with `set_card_details`. It writes nothing itself.
+- **Dashboard:** a new home widget **Card budgets** (each card's room per group, the soonest safe day first). The card
+  page shows the safe day, a bar per group and the points.
+
 ## 2.3.1 (2026-11-23)
 
 - **Fix: editing only the amount of a 0-amount row** booked it as income (the kind came from the sign of 0), so the
