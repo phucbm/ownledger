@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.4.1 (2026-11-27)
+
+- **Card budgets shows every card with a statement day:** the last safe day no longer needs cashback terms (3 days
+  before the statement date, or the card's own `post_margin_days`). Cards without terms say so. `cards` gives
+  `safe_until` for every card.
+
 ## 2.4.0 (2026-11-27)
 
 Card spending room and the last safe day (plan 006). Data format stays 1; every new field is optional.

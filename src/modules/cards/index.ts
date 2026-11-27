@@ -4,8 +4,8 @@ import { addDays, daysBetween, isDate } from "../../engine/dates.js";
 import type { ISODate, Issue, Ledger } from "../../engine/types.js";
 import type { AttentionItem, ModuleDef } from "../types.js";
 import { isOpen } from "../util.js";
-import { cashback, cardValues, feeWaiver, isAnnualFee, points, statements, type CashbackPeriod, type PointsStatus, type Statement } from "./statements.js";
-import { CARDS_FILE, STATEMENTS_FILE, cardsData, recordFor, termsOf, validMargin, type BankStatement, type CardRecord, type CardsData } from "./terms.js";
+import { cashback, cardValues, feeWaiver, isAnnualFee, openClose, points, statements, type CashbackPeriod, type PointsStatus, type Statement } from "./statements.js";
+import { CARDS_FILE, STATEMENTS_FILE, cardsData, recordFor, termsOf, validMargin, DEFAULT_POST_MARGIN, type BankStatement, type CardRecord, type CardsData } from "./terms.js";
 import { CARD_TYPES } from "./types.js";
 
 const KINDS = new Set(["credit", "debit", "atm"]);
@@ -138,6 +138,8 @@ export interface CardSummary {
   daysToDue: number | null;
   cashback: CashbackPeriod | null; // this period
   points: PointsStatus | null; // points cards (cashback payout: points)
+  /** the open statement's close and the last day a purchase is sure to land on it (needs statement_day; margin from the cashback terms, else 3) */
+  safe: { closesOn: ISODate; safeUntil: ISODate; daysLeft: number } | null;
   missing: string[]; // terms not set yet (statement_day, due_day, limit, cashback rates…)
 }
 
@@ -184,11 +186,19 @@ export function cardList(l: Ledger, asOf: ISODate, o: { includeClosed?: boolean 
       daysToDue: last?.due ? daysBetween(asOf, last.due) : null,
       cashback: cb,
       points: points(l, a.id, asOf),
+      safe: safeDay(t, asOf),
       missing,
     });
   }
   const key = (c: CardSummary) => (c.toPay > 0 && c.due ? c.due : "9999-99-99");
   return out.sort((x, y) => (key(x) < key(y) ? -1 : key(x) > key(y) ? 1 : y.owed - x.owed));
+}
+
+function safeDay(t: ReturnType<typeof termsOf>, asOf: ISODate): CardSummary["safe"] {
+  if (!t.statementDay) return null;
+  const closesOn = openClose(asOf, t.statementDay);
+  const safeUntil = addDays(closesOn, -(t.cashback?.postMargin ?? DEFAULT_POST_MARGIN));
+  return { closesOn, safeUntil, daysLeft: daysBetween(asOf, safeUntil) };
 }
 
 /* ------------------------------------------------------------------ Needs you */

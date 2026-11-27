@@ -316,6 +316,7 @@ export function buildServer(env: Env, props: Props, src: DataSource = sourceFor(
             ...(c.cashback.incomplete ? { note: "some rates not set" } : {}),
           }
         : null,
+      ...(c.safe ? { safe_until: c.safe.safeUntil, safe_days_left: c.safe.daysLeft } : {}),
       ...(c.points ? { points: { balance: c.points.balance, pending: c.points.pending, redeem_min: c.points.redeemMin, can_redeem: c.points.canRedeem, expiring: c.points.lots.filter((x) => x.expires).slice(0, 3), expired: c.points.expired } } : {}),
       ...(c.bank ? { bank: c.bank } : {}),
       ...(per.get(c.account)?.product ? { product: per.get(c.account)!.product } : {}),

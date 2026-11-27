@@ -388,6 +388,7 @@ export interface CardSummary {
   daysToDue: number | null;
   cashback: CashbackPeriod | null;
   points?: PointsStatus | null;
+  safe?: { closesOn: string; safeUntil: string; daysLeft: number } | null;
   missing: string[];
 }
 

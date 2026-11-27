@@ -118,6 +118,13 @@ describe("last safe day", () => {
     expect(cashback(L, "wg", "2026-11-30").find((x) => x.open)).toMatchObject({ closesOn: "2026-12-31", safeUntil: "2026-12-28" }); // the close day starts the next period
   });
 
+  it("every card with a statement day has one, cashback terms or not", () => {
+    const { ledger: L } = ledger([], { "data/accounts.yaml": files["data/accounts.yaml"] + "- {id: bare, name: Bare Card, type: credit_card, details: {statement_day: 15}}\n" });
+    const list = cardList(L, "2026-11-27");
+    expect(list.find((c) => c.account === "bare")).toMatchObject({ cashback: null, safe: { closesOn: "2026-12-15", safeUntil: "2026-12-12", daysLeft: 15 } });
+    expect(list.find((c) => c.account === "su")!.safe).toMatchObject({ safeUntil: "2026-12-05" }); // its own 2-day margin
+  });
+
   it("the card's own margin", () => {
     const { ledger: L } = ledger([buy("2026-01-10", "su", 100000, "food/groceries")]);
     expect(cashback(L, "su", "2026-02-01").find((x) => x.open)).toMatchObject({ closesOn: "2026-02-07", safeUntil: "2026-02-05", daysLeft: 4 });
