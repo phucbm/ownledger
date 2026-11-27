@@ -31,7 +31,7 @@ export default function CardBudgets({ widget, menu }: WidgetProps) {
   const title = useWidgetTitle(widget, "widget.card_budgets");
   const on = Boolean(useMe().data?.features?.cards);
   const { data, error, isLoading } = useCardsModule(on);
-  const rows = (data?.cards ?? []).filter((c) => c.status !== "cancelled" && c.safe).sort((x, y) => order(x) - order(y));
+  const rows = (data?.cards ?? []).filter((c) => !["cancelled", "inactive", "locked"].includes(c.status) && c.safe).sort((x, y) => order(x) - order(y));
   return (
     <WidgetCard title={title} titleHref="#/cards" menu={menu} loading={on && isLoading} error={on ? error?.message : undefined} empty={!on || (data && rows.length === 0) ? t("budgets.empty") : undefined}>
       <ul className="flex flex-col divide-y">
@@ -43,7 +43,7 @@ export default function CardBudgets({ widget, menu }: WidgetProps) {
           return (
             <li key={c.account} className="flex flex-col gap-1.5 py-2">
               <div className="flex items-baseline justify-between gap-2">
-                <a href={cardHref(c.account)} className="min-w-0 truncate rounded-md text-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">{c.name}</a>
+                <a href={cardHref(c.account)} className="min-w-0 truncate rounded-md text-sm font-medium outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/50">{c.name}{c.last4 && !c.name.includes(c.last4) && <span className="text-muted-foreground"> *{c.last4}</span>}</a>
                 <span className={cn("shrink-0 text-xs tabular-nums", days < 0 ? "text-muted-foreground" : days <= 3 ? "font-medium text-warning" : "text-muted-foreground")}>
                   {days < 0 ? t("budgets.nextPeriod") : t("budgets.safe", { date: formatDate(safe.safeUntil, lang, { day: "2-digit", month: "2-digit" }), n: days })}
                 </span>

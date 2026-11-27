@@ -1,5 +1,10 @@
 # Changelog
 
+## 2.4.2 (2026-11-27)
+
+- **Card budgets hides cards not in use** (card record `status: inactive` or `locked`, as well as `cancelled`), and
+  shows a card's last 4 digits when its name doesn't already have them.
+
 ## 2.4.1 (2026-11-27)
 
 - **Card budgets shows every card with a statement day:** the last safe day no longer needs cashback terms (3 days
