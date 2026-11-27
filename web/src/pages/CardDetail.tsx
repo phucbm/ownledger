@@ -143,6 +143,35 @@ function Cashback({ d }: { d: Detail }) {
           {cur.cap !== null && cur.capLeft !== null && <KV label={t("cards.capLeftLabel")}><Money amount={cur.capLeft} /> <span className="text-muted-foreground">/ <Money amount={cur.cap} mode="short" /></span></KV>}
         </dl>
       )}
+      {cur?.safeUntil && cur.daysLeft !== undefined && (
+        <p className={cn("text-xs", cur.daysLeft >= 0 && cur.daysLeft <= 3 ? "text-warning" : "text-muted-foreground")}>
+          {cur.daysLeft >= 0 ? t("cards.safeUntil", { date: formatDate(cur.safeUntil, lang), n: cur.daysLeft }) : t("cards.safePassed", { date: formatDate(cur.safeUntil, lang) })}
+        </p>
+      )}
+      {cur && (cur.groups ?? []).some((g) => g.cap !== null) && (
+        <ul className="flex flex-col gap-2">
+          {(cur.groups ?? []).filter((g) => g.cap !== null).map((g) => (
+            <li key={g.label} className="flex flex-col gap-1">
+              <div className="flex items-baseline justify-between gap-2 text-xs">
+                <span className="font-medium">{g.label}{g.rate !== null && <span className="text-muted-foreground"> · {g.rate}%</span>}{g.inStore && <span className="text-muted-foreground"> · {t("cards.inStore")}</span>}</span>
+                <span className="tabular-nums text-muted-foreground"><Money amount={g.earned} mode="short" /> / <Money amount={g.cap!} mode="short" /></span>
+              </div>
+              <Bar value={g.earned} max={g.cap!} label={g.label} />
+              {g.room !== null && g.room > 0 && <p className="text-xs text-muted-foreground">{t("cards.groupRoom", { amount: formatNumber(g.room, lang) })}</p>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {cur && !(cur.groups ?? []).some((g) => g.cap !== null) && cur.roomSpend != null && cur.roomSpend > 0 && (
+        <p className="text-xs text-muted-foreground">{t(cur.roomEstimate ? "cards.roomEstimate" : "cards.room", { amount: formatNumber(cur.roomSpend, lang) })}</p>
+      )}
+      {d.summary?.points && (
+        <dl className="divide-y">
+          <KV label={t("cards.points")}><span className="tabular-nums">{formatNumber(d.summary.points.balance, lang)}</span>{d.summary.points.redeemMin !== null && <span className="text-muted-foreground"> / {formatNumber(d.summary.points.redeemMin, lang)}</span>}</KV>
+          {d.summary.points.pending > 0 && <KV label={t("cards.pointsPending")}><span className="tabular-nums">{formatNumber(d.summary.points.pending, lang)}</span></KV>}
+          {d.summary.points.lots[0]?.expires && <KV label={t("cards.pointsExpire")}>{formatNumber(d.summary.points.lots[0].left, lang)} · {formatDate(d.summary.points.lots[0].expires, lang)}</KV>}
+        </dl>
+      )}
       {cur && cur.minSpend !== null && (
         <div className="flex flex-col gap-1">
           <Bar value={cur.spend} max={cur.minSpend} label={t("cards.minSpend")} />

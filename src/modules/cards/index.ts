@@ -1,11 +1,11 @@
 import { parse as parseYaml } from "yaml";
 import { holdingsAt } from "../../engine/balances.js";
-import { addDays, addMonths, daysBetween, isDate } from "../../engine/dates.js";
+import { addDays, daysBetween, isDate } from "../../engine/dates.js";
 import type { ISODate, Issue, Ledger } from "../../engine/types.js";
 import type { AttentionItem, ModuleDef } from "../types.js";
 import { isOpen } from "../util.js";
-import { cashback, cardValues, feeWaiver, isAnnualFee, statements, type CashbackPeriod, type Statement } from "./statements.js";
-import { CARDS_FILE, STATEMENTS_FILE, cardsData, recordFor, termsOf, type BankStatement, type CardRecord, type CardsData } from "./terms.js";
+import { cashback, cardValues, feeWaiver, isAnnualFee, points, statements, type CashbackPeriod, type PointsStatus, type Statement } from "./statements.js";
+import { CARDS_FILE, STATEMENTS_FILE, cardsData, recordFor, termsOf, validMargin, type BankStatement, type CardRecord, type CardsData } from "./terms.js";
 import { CARD_TYPES } from "./types.js";
 
 const KINDS = new Set(["credit", "debit", "atm"]);
@@ -80,8 +80,19 @@ function checkCards(l: Ledger): Issue[] {
           if (rate !== null && rate !== undefined && !(typeof rate === "number" && rate >= 0 && rate <= 100)) warn("data/accounts.yaml", `${a.id} cashback.rules[${j}]`, "rate: a % from 0 to 100");
           const cats = Array.isArray(rule?.categories) ? (rule.categories as string[]) : [];
           for (const c of cats) if (!categoryExists(l, c)) warn("data/accounts.yaml", `${a.id} cashback.rules[${j}]`, `unknown category "${c}"`);
+          if (rule?.merchants !== undefined && !(Array.isArray(rule.merchants) && rule.merchants.every((m) => typeof m === "string" && m.trim()))) warn("data/accounts.yaml", `${a.id} cashback.rules[${j}]`, "merchants: a list of words (e.g. [shopee, lazada])");
+          if (!cats.length && !(Array.isArray(rule?.merchants) && rule.merchants.length)) warn("data/accounts.yaml", `${a.id} cashback.rules[${j}]`, "a rule needs categories or merchants");
+          if (rule?.cap !== undefined) {
+            const amt = typeof rule.cap === "number" ? rule.cap : (rule.cap as Record<string, unknown> | null)?.amount;
+            if (!(Number.isInteger(amt) && (amt as number) > 0)) warn("data/accounts.yaml", `${a.id} cashback.rules[${j}]`, "cap: a positive whole amount");
+          }
+          if (rule?.in_store !== undefined && typeof rule.in_store !== "boolean") warn("data/accounts.yaml", `${a.id} cashback.rules[${j}]`, "in_store: true or false");
         }
-        for (const k of ["cap", "min_spend", "spend_max"]) {
+        if (cb.post_margin_days !== undefined && !validMargin(cb.post_margin_days)) warn("data/accounts.yaml", a.id, "cashback.post_margin_days: whole days from 0 to 10 (3 is used)");
+        if (cb.payout !== undefined && cb.payout !== "auto" && cb.payout !== "points") warn("data/accounts.yaml", a.id, "cashback.payout: auto or points");
+        for (const k of ["redeem_min", "expire_months"]) if (cb[k] !== undefined && cb.payout !== "points") warn("data/accounts.yaml", a.id, `cashback.${k} only counts with payout: points`);
+        if (cb.expire_months !== undefined && !(Number.isInteger(cb.expire_months) && (cb.expire_months as number) > 0)) warn("data/accounts.yaml", a.id, "cashback.expire_months: a whole number of months");
+        for (const k of ["cap", "min_spend", "spend_max", "redeem_min"]) {
           const v = cb[k] as Record<string, unknown> | number | undefined;
           if (v === undefined) continue;
           const amt = typeof v === "number" ? v : v?.amount;
@@ -126,6 +137,7 @@ export interface CardSummary {
   due: ISODate | null;
   daysToDue: number | null;
   cashback: CashbackPeriod | null; // this period
+  points: PointsStatus | null; // points cards (cashback payout: points)
   missing: string[]; // terms not set yet (statement_day, due_day, limit, cashback rates…)
 }
 
@@ -171,6 +183,7 @@ export function cardList(l: Ledger, asOf: ISODate, o: { includeClosed?: boolean 
       due: last?.due ?? null,
       daysToDue: last?.due ? daysBetween(asOf, last.due) : null,
       cashback: cb,
+      points: points(l, a.id, asOf),
       missing,
     });
   }
@@ -203,7 +216,7 @@ function cardAttention(l: Ledger, asOf: ISODate): AttentionItem[] {
       out.push({ kind: "card_near_limit", module: "cards", severity: "amber", date: asOf, title: `Card ${c.name} is at ${Math.round(c.used * 100)}% of its limit`, amount: c.owed, account: c.account, name: c.name, params: { pct: Math.round(c.used * 100), limit: c.limit }, link: link(c.account) });
     }
     // cashback: expected for a closed period but not received by when the bank pays it
-    for (const p of cashback(l, c.account, asOf)) {
+    for (const p of c.points ? [] : cashback(l, c.account, asOf)) {
       if (p.open || p.expected <= 0 || p.received >= p.expected || p.payBy >= asOf || daysBetween(p.payBy, asOf) > 45) continue;
       out.push({ kind: "cashback_missing", module: "cards", severity: "amber", date: p.payBy, title: `Card ${c.name}: expected cashback ${p.expected} for ${p.from}…${p.close}, received ${p.received}`, amount: p.expected - p.received, account: c.account, name: c.name, params: { from: p.from, close: p.close, expected: p.expected, received: p.received }, link: link(c.account), ask: true });
     }
@@ -211,10 +224,29 @@ function cardAttention(l: Ledger, asOf: ISODate): AttentionItem[] {
     if (cb && cb.cap !== null && cb.capLeft !== null && cb.capLeft <= cb.cap * 0.1 && cb.expected > 0) {
       out.push({ kind: "cashback_cap", module: "cards", severity: "info", date: asOf, title: `Card ${c.name}: cashback cap almost used (${cb.capLeft} left)`, amount: cb.capLeft, account: c.account, name: c.name, link: link(c.account) });
     }
-    if (cb && cb.minSpend !== null && !cb.minMet && c.current) {
-      const end = c.current ? nextCloseOf(l, c.account, asOf) : null;
-      const left = end ? daysBetween(asOf, end) : null;
-      if (left !== null && left <= 10) out.push({ kind: "cashback_min", module: "cards", severity: "info", date: end!, title: `Card ${c.name}: spend ${cb.needForMin} more in ${left} days to get cashback`, amount: cb.needForMin, account: c.account, name: c.name, days: left, link: link(c.account) });
+    // the minimum and the room left, counted to the last safe day (statement date − post margin), not to the close
+    const days = cb?.daysLeft;
+    if (cb && cb.safeUntil && days !== undefined && days >= 0) {
+      if (cb.minSpend !== null && !cb.minMet && days <= 7) {
+        out.push({ kind: "cashback_min", module: "cards", severity: days <= 2 ? "red" : "amber", date: cb.safeUntil, title: `Card ${c.name}: spend ${cb.needForMin} more by ${cb.safeUntil} (${days} days left) to get cashback`, amount: cb.needForMin, account: c.account, name: c.name, days, params: { amount: cb.needForMin, safe_until: cb.safeUntil }, link: link(c.account) });
+      } else if (days <= 3) {
+        const rooms = cb.groups.filter((g) => g.room !== null && g.room > 0);
+        const total = rooms.length ? rooms.reduce((s, g) => s + g.room!, 0) : (cb.roomSpend ?? 0);
+        if (total > 0 && (cb.earnLeft === null || cb.earnLeft === undefined || cb.earnLeft > 0)) {
+          const list = rooms.length ? rooms.map((g) => `${g.label} ${g.room} at ${g.rate}%${g.inStore ? " (in store)" : ""}`).join(", ") : `${cb.roomSpend}${cb.roomEstimate ? " (estimate)" : ""}`;
+          out.push({ kind: "card_spend_room", module: "cards", severity: "info", date: cb.safeUntil, title: `Card ${c.name}: room left to earn cashback by ${cb.safeUntil} (${days} days left): ${list}`, amount: cb.earnLeft ?? total, account: c.account, name: c.name, days, params: { safe_until: cb.safeUntil, groups: list, earn_left: cb.earnLeft ?? null }, link: link(c.account) });
+        }
+      }
+    }
+    if (c.points) {
+      const p = c.points;
+      if (p.canRedeem && p.redeemMin !== null) out.push({ kind: "card_points_redeem", module: "cards", severity: "info", date: asOf, title: `Card ${c.name}: ${p.balance} points can be cashed in (from ${p.redeemMin})`, amount: p.balance, account: c.account, name: c.name, params: { points: p.balance, min: p.redeemMin }, link: link(c.account) });
+      const soon = p.lots.filter((x) => x.expires && daysBetween(asOf, x.expires) <= 30);
+      if (soon.length) {
+        const n = soon.reduce((s, x) => s + x.left, 0);
+        const first = soon[0]!.expires!;
+        out.push({ kind: "card_points_expiring", module: "cards", severity: "amber", date: first, title: `Card ${c.name}: ${n} points expire by ${soon[soon.length - 1]!.expires}${p.canRedeem ? "" : ` (below the ${p.redeemMin} to cash in)`}`, amount: n, account: c.account, name: c.name, days: daysBetween(asOf, first), params: { points: n, expires: first }, link: link(c.account) });
+      }
     }
   }
   // fee waivers and annual fees
@@ -260,15 +292,6 @@ function cardAttention(l: Ledger, asOf: ISODate): AttentionItem[] {
     if (days <= 60) out.push({ kind: "card_not_worth", module: "cards", severity: "info", date: next, title: `${v.name}: cost ${-v.last12.net} more than it gave in the last 12 months; fee month ${next.slice(0, 7)}`, amount: v.last12.net, account: v.account ?? undefined, name: v.name, days, link: v.account ? link(v.account) : "#/cards", ask: true });
   }
   return out;
-}
-
-function nextCloseOf(l: Ledger, account: string, asOf: ISODate): ISODate | null {
-  const a = l.accounts.find((x) => x.id === account);
-  const sd = a ? termsOf(a, recordFor(l, account)).statementDay : null;
-  if (!sd) return null;
-  const [y, m] = [Number(asOf.slice(0, 4)), Number(asOf.slice(5, 7))];
-  const c = `${y}-${String(m).padStart(2, "0")}-${String(Math.min(sd, new Date(Date.UTC(y, m, 0)).getUTCDate())).padStart(2, "0")}`;
-  return c >= asOf ? c : addMonths(c, 1, sd);
 }
 
 export const cardsModule: ModuleDef = {

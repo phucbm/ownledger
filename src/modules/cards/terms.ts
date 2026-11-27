@@ -5,8 +5,18 @@ import { day, int, num, str } from "../util.js";
 
 export interface CashbackRule {
   categories: string[]; // category paths (prefix match)
+  /** words looked for in a transaction's merchant and note (accents and case ignored); a merchant rule wins over a category rule */
+  merchants: string[];
   rate: number | null; // %; null = not known yet (a name gives the categories, never the rate)
+  /** the most this rule pays per period (the global cap still applies on top) */
+  cap: number | null;
+  /** the bank pays it only for in-store payments (the ledger can't tell, so it's a reminder) */
+  inStore: boolean;
+  label: string | null;
 }
+
+/** Days before the statement date a purchase should be made to be sure it posts in time. */
+export const DEFAULT_POST_MARGIN = 3;
 
 export interface CashbackTerms {
   base: number; // % on everything else
@@ -15,6 +25,14 @@ export interface CashbackTerms {
   min_spend: { amount: number; per: "statement" | "month" } | null;
   spend_max: { amount: number; per: "statement" | "month" } | null;
   paid_on: { kind: "next_statement" } | { kind: "days_after"; days: number };
+  /** days before the statement date that are too late to be sure a purchase lands on this statement */
+  postMargin: number;
+  /** auto: the bank pays it (to the card or an account); points: a balance the owner cashes in */
+  payout: "auto" | "points";
+  /** points: cash in only from this balance */
+  redeemMin: number | null;
+  /** points: earned points expire this many months after their statement */
+  expireMonths: number | null;
 }
 
 export interface FeeWaiver {
@@ -49,12 +67,15 @@ export function parseCashback(v: unknown): CashbackTerms | null {
   if (!v || typeof v !== "object" || Array.isArray(v)) return null;
   const c = v as Record<string, unknown>;
   const rules: CashbackRule[] = [];
+  const strings = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string" && x.trim() !== "").map((x) => x.trim()) : typeof v === "string" && v.trim() ? [v.trim()] : []);
   for (const r of Array.isArray(c.rules) ? c.rules : []) {
     if (!r || typeof r !== "object") continue;
-    const cats = (r as Record<string, unknown>).categories;
-    const rate = num((r as Record<string, unknown>).rate) ?? null;
-    const list = Array.isArray(cats) ? cats.filter((x): x is string => typeof x === "string") : typeof cats === "string" ? [cats] : [];
-    if (list.length) rules.push({ categories: list, rate });
+    const x = r as Record<string, unknown>;
+    const categories = strings(x.categories);
+    const merchants = strings(x.merchants);
+    if (!categories.length && !merchants.length) continue;
+    const cap = amountPer(x.cap)?.amount ?? null;
+    rules.push({ categories, merchants, rate: num(x.rate) ?? null, cap, inStore: x.in_store === true, label: str(x.label) ?? null });
   }
   const paid = typeof c.paid_on === "string" ? c.paid_on : "next_statement";
   const m = /^days_after:(\d+)$/.exec(paid);
@@ -65,8 +86,14 @@ export function parseCashback(v: unknown): CashbackTerms | null {
     min_spend: amountPer(c.min_spend),
     spend_max: amountPer(c.spend_max),
     paid_on: m ? { kind: "days_after", days: Number(m[1]) } : { kind: "next_statement" },
+    postMargin: validMargin(c.post_margin_days) ? (c.post_margin_days as number) : DEFAULT_POST_MARGIN,
+    payout: c.payout === "points" ? "points" : "auto",
+    redeemMin: c.payout === "points" ? (amountPer(c.redeem_min)?.amount ?? null) : null,
+    expireMonths: c.payout === "points" && Number.isInteger(c.expire_months) && (c.expire_months as number) > 0 ? (c.expire_months as number) : null,
   };
 }
+
+export const validMargin = (v: unknown) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 10;
 
 /** Terms from the card account's details, with what the card record (cards.yaml) adds for debit cards. */
 export function termsOf(a: Account, record?: CardRecord): CardTerms {

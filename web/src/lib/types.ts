@@ -341,6 +341,34 @@ export interface CashbackPeriod {
   capLeft: number | null;
   received: number;
   payBy: string;
+  groups?: CashbackGroup[];
+  closesOn?: string;
+  safeUntil?: string;
+  daysLeft?: number;
+  roomSpend?: number | null;
+  roomEstimate?: boolean;
+  earnLeft?: number | null;
+}
+
+export interface CashbackGroup {
+  label: string;
+  categories: string[];
+  merchants: string[];
+  rate: number | null;
+  spend: number;
+  earned: number;
+  cap: number | null;
+  room: number | null;
+  inStore: boolean;
+}
+
+export interface PointsStatus {
+  balance: number;
+  pending: number;
+  redeemMin: number | null;
+  canRedeem: boolean;
+  lots: { close: string; left: number; expires: string | null }[];
+  expired: number;
 }
 
 export interface CardSummary {
@@ -359,6 +387,7 @@ export interface CardSummary {
   due: string | null;
   daysToDue: number | null;
   cashback: CashbackPeriod | null;
+  points?: PointsStatus | null;
   missing: string[];
 }
 

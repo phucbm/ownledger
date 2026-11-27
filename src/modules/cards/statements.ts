@@ -4,7 +4,8 @@ import { addDays, addMonths, dayIn, daysBetween, monthStart, parts } from "../..
 import type { Account, Category, ISODate, Ledger, Plan, Transaction } from "../../engine/types.js";
 import { dueDates } from "../loans/engine.js";
 import { isOpen } from "../util.js";
-import { cardsData, recordFor, termsOf, type CardRecord, type CardTerms, type CashbackTerms } from "./terms.js";
+import { fold } from "../../engine/reports.js";
+import { cardsData, recordFor, termsOf, type CardRecord, type CardTerms, type CashbackRule, type CashbackTerms } from "./terms.js";
 
 /* ------------------------------------------------------------------ dates */
 
@@ -207,12 +208,27 @@ export function statements(l: Ledger, account: string, asOf: ISODate): Statement
 
 /* ------------------------------------------------------------------ cashback */
 
+export interface CashbackGroup {
+  /** the rule's label, else its categories and merchants; "other" for the base rate */
+  label: string;
+  categories: string[];
+  merchants: string[];
+  rate: number | null;
+  spend: number;
+  earned: number; // before the minimum and the global cap, after the rule's cap
+  cap: number | null;
+  /** more spend this rule still pays for (its cap and the global cap left); null when it has no cap */
+  room: number | null;
+  inStore: boolean;
+}
+
 export interface CashbackPeriod {
   from: ISODate;
   close: ISODate;
   open: boolean;
   spend: number; // eligible spending on the card in the period (refunds take it down)
   byRate: { rate: number | null; spend: number; categories: string[] }[];
+  groups: CashbackGroup[];
   expected: number; // from the rules (0 when the minimum spend isn't reached)
   incomplete: boolean; // some spending is in a category whose rate isn't known
   minSpend: number | null;
@@ -220,13 +236,36 @@ export interface CashbackPeriod {
   needForMin: number; // more spending to reach the minimum (0 when met)
   cap: number | null;
   capLeft: number | null;
-  received: number; // cashback rows that pay this period (by paid_on)
+  received: number; // cashback rows that pay this period (by paid_on); for points cards: points cashed in then
   payBy: ISODate; // when the bank should have paid it
+  /** open period: the statement date it will close on */
+  closesOn?: ISODate;
+  /** open period: the last day a purchase is sure to land on this statement (closesOn − post margin) */
+  safeUntil?: ISODate;
+  /** open period: days from asOf to safeUntil (0 = today is the last day; negative = too late, it counts for the next one) */
+  daysLeft?: number;
+  /** open period: more spend worth making on the whole card, when no rule has its own cap (spend_max, or the global cap ÷ the best rate) */
+  roomSpend?: number | null;
+  /** roomSpend comes from the global cap and the best rate, not from spend_max */
+  roomEstimate?: boolean;
+  /** open period: cashback still to earn before the caps (null with no cap at all) */
+  earnLeft?: number | null;
 }
 
-function rateFor(cb: CashbackTerms, category: string): number | null {
-  for (const r of cb.rules) if (r.categories.some((c) => category === c || category.startsWith(c + "/"))) return r.rate;
-  return cb.base;
+/** Folded words of a transaction a merchant rule looks in. */
+const merchantText = (x: Transaction) => fold(`${x.merchant ?? ""} ${x.note ?? ""}`);
+
+function ruleFor(cb: CashbackTerms, category: string, text?: string): CashbackRule | null {
+  if (text) for (const r of cb.rules) if (r.merchants.some((m) => text.includes(fold(m)))) return r;
+  for (const r of cb.rules) if (r.categories.some((c) => category === c || category.startsWith(c + "/"))) return r;
+  return null;
+}
+
+const ruleLabel = (r: CashbackRule) => r.label ?? [...r.categories, ...r.merchants].join(", ");
+
+/** The statement date the open period will close on (the first one after asOf). */
+export function openClose(asOf: ISODate, sd: number): ISODate {
+  return closeOnOrAfter(addDays(asOf, 1), sd);
 }
 
 /** Cashback periods: the statement periods (credit) or monthly cycles from statement_day (debit cards). */
@@ -236,6 +275,22 @@ function cyclesFor(l: Ledger, account: string, sd: number, asOf: ISODate, from: 
   let c = closeOnOrAfter(from, sd);
   for (; c <= asOf; c = nextClose(c, sd)) out.push({ from: addDays(prevClose(c, sd), 1), close: c, open: false });
   out.push({ from: addDays(prevClose(c, sd), 1), close: asOf, open: true });
+  return out;
+}
+
+/** Cashback rows booked for this card in [from, to]: on the card, or elsewhere carrying card: <account>. */
+function cashbackIn(txs: Transaction[], account: string, cats: Map<string, Category>, from: ISODate, to: ISODate): { date: ISODate; amount: number }[] {
+  const out: { date: ISODate; amount: number }[] = [];
+  for (const x of txs) {
+    if (x.date < from || x.date > to) continue;
+    const k = lineKind(x, account, cats);
+    let a = 0;
+    if (k?.kind === "cashback") a = k.amount;
+    else if (x.card === account && !x.lines.some((ln) => ln.account === account)) {
+      for (const ln of x.lines) if (ln.category && topOf(ln.category) === "cashback") a += -ln.amount;
+    }
+    if (a) out.push({ date: x.date, amount: a });
+  }
   return out;
 }
 
@@ -250,60 +305,167 @@ export function cashback(l: Ledger, account: string, asOf: ISODate): CashbackPer
   const { map: cats } = flattenCategories(l.categories);
   const txs = l.transactions.filter((x) => !x.void && x.date <= addMonths(asOf, 2) && (x.lines.some((ln) => ln.account === account) || x.card === account));
   if (!txs.length) return [];
+  const hasMerchantRules = cb.rules.some((r) => r.merchants.length);
   const out: CashbackPeriod[] = [];
   for (const p of cyclesFor(l, account, sd, asOf, txs[0]!.date)) {
-    const groups = new Map<string, { rate: number | null; spend: number; categories: Set<string> }>();
+    // one group per rule (by its index), "base" for everything else
+    const groups = new Map<string, { rule: CashbackRule | null; spend: number; categories: Set<string> }>();
     let spend = 0;
     for (const x of txs) {
       if (x.date < p.from || x.date > p.close || x.date > asOf) continue;
       const k = lineKind(x, account, cats);
       if (!k || (k.kind !== "purchase" && k.kind !== "refund")) continue;
+      const text = hasMerchantRules ? merchantText(x) : undefined;
       for (const ln of x.lines) {
         if (!ln.category || isSystemCategory(ln.category) || cats.get(ln.category)?.kind === "income") continue;
-        const rate = rateFor(cb, ln.category);
-        const g = groups.get(String(rate)) ?? { rate, spend: 0, categories: new Set<string>() };
+        const rule = ruleFor(cb, ln.category, text);
+        const key = rule ? String(cb.rules.indexOf(rule)) : "base";
+        const g = groups.get(key) ?? { rule, spend: 0, categories: new Set<string>() };
         g.spend += ln.amount;
         g.categories.add(ln.category);
-        groups.set(String(rate), g);
+        groups.set(key, g);
         spend += ln.amount;
       }
     }
+    // every rule shows in the open period, spent on or not, so its room is known
+    if (p.open) cb.rules.forEach((r, i) => { if (!groups.has(String(i))) groups.set(String(i), { rule: r, spend: 0, categories: new Set() }); });
     const minSpend = cb.min_spend?.amount ?? null;
     const minMet = minSpend === null || spend >= minSpend;
     const scale = cb.spend_max && spend > cb.spend_max.amount ? cb.spend_max.amount / spend : 1;
-    let expected = 0;
+    let raw = 0;
     let incomplete = false;
+    const list: CashbackGroup[] = [];
     for (const g of groups.values()) {
-      if (g.rate === null) {
+      const rate = g.rule ? g.rule.rate : cb.base;
+      let earned = 0;
+      if (rate === null) {
         if (g.spend > 0) incomplete = true;
-        continue;
+      } else {
+        earned = (Math.max(0, g.spend) * rate) / 100;
+        if (g.rule?.cap != null) earned = Math.min(earned, g.rule.cap);
       }
-      expected += (Math.max(0, g.spend) * g.rate) / 100;
+      raw += earned;
+      list.push({
+        label: g.rule ? ruleLabel(g.rule) : "other",
+        categories: g.rule ? (g.rule.categories.length ? g.rule.categories : [...g.categories]) : [...g.categories],
+        merchants: g.rule?.merchants ?? [],
+        rate,
+        spend: g.spend,
+        earned: Math.round(earned),
+        cap: g.rule?.cap ?? null,
+        room: null,
+        inStore: g.rule?.inStore ?? false,
+      });
     }
-    expected = minMet ? Math.round(expected * scale) : 0;
+    let expected = minMet ? Math.round(raw * scale) : 0;
     const cap = cb.cap?.amount ?? null;
     if (cap !== null) expected = Math.min(expected, cap);
+    // room: what the caps still pay for, counted on what was earned before the minimum (the minimum is its own warning)
+    const globalLeft = cap === null ? null : Math.max(0, cap - Math.round(raw * scale));
+    for (const g of list) {
+      if (g.cap === null || !g.rate) continue;
+      let left = Math.max(0, g.cap - g.earned);
+      if (globalLeft !== null) left = Math.min(left, globalLeft);
+      g.room = Math.ceil((left * 100) / g.rate);
+    }
+    const byRateMap = new Map<string, { rate: number | null; spend: number; categories: string[] }>();
+    for (const g of list) {
+      if (!g.spend && !g.categories.length) continue;
+      const r = byRateMap.get(String(g.rate)) ?? { rate: g.rate, spend: 0, categories: [] };
+      r.spend += g.spend;
+      r.categories.push(...g.categories.filter((c) => !r.categories.includes(c)));
+      byRateMap.set(String(g.rate), r);
+    }
     const payBy = cb.paid_on.kind === "next_statement" ? nextClose(p.open ? closeOnOrAfter(p.close, sd) : p.close, sd) : addDays(p.close, cb.paid_on.days);
     const winFrom = p.open ? payBy : addDays(p.close, 1);
-    let received = 0;
-    if (!p.open) {
-      for (const x of txs) {
-        if (x.date < winFrom || x.date > payBy) continue;
-        const k = lineKind(x, account, cats);
-        if (k?.kind === "cashback") received += k.amount;
-        else if (x.card === account && !x.lines.some((ln) => ln.account === account)) {
-          for (const ln of x.lines) if (ln.category && topOf(ln.category) === "cashback") received += -ln.amount;
-        }
-      }
-    }
-    out.push({
+    const received = p.open ? 0 : cashbackIn(txs, account, cats, winFrom, payBy).reduce((s, x) => s + x.amount, 0);
+    const row: CashbackPeriod = {
       from: p.from, close: p.close, open: p.open, spend,
-      byRate: [...groups.values()].map((g) => ({ rate: g.rate, spend: g.spend, categories: [...g.categories] })).sort((x, y) => y.spend - x.spend),
+      byRate: [...byRateMap.values()].filter((r) => r.spend !== 0).sort((x, y) => y.spend - x.spend),
+      groups: list.filter((g) => p.open || g.spend !== 0).sort((x, y) => (y.rate ?? -1) - (x.rate ?? -1)),
       expected, incomplete, minSpend, minMet, needForMin: minSpend === null ? 0 : Math.max(0, minSpend - spend),
       cap, capLeft: cap === null ? null : Math.max(0, cap - expected), received, payBy,
-    });
+    };
+    if (p.open) {
+      const closesOn = openClose(asOf, sd);
+      const safeUntil = addDays(closesOn, -cb.postMargin);
+      const ruleCaps = list.some((g) => g.room !== null);
+      const best = Math.max(0, ...list.map((g) => g.rate ?? 0));
+      let roomSpend: number | null = null;
+      let roomEstimate = false;
+      if (!ruleCaps) {
+        if (cb.spend_max) roomSpend = Math.max(0, cb.spend_max.amount - spend);
+        else if (globalLeft !== null && best > 0) {
+          roomSpend = Math.ceil((globalLeft * 100) / best);
+          roomEstimate = true;
+        }
+      }
+      const groupLeft = list.reduce((s, g) => s + (g.cap !== null && g.rate ? Math.max(0, g.cap - g.earned) : 0), 0);
+      const earnLeft = ruleCaps ? (globalLeft === null ? groupLeft : Math.min(groupLeft, globalLeft)) : globalLeft;
+      Object.assign(row, { closesOn, safeUntil, daysLeft: daysBetween(asOf, safeUntil), roomSpend, roomEstimate, earnLeft });
+    }
+    out.push(row);
   }
   return out;
+}
+
+/* ------------------------------------------------------------------ points */
+
+export interface PointsStatus {
+  account: string;
+  name: string;
+  /** points held now: earned at each closed statement, less cashed in and expired */
+  balance: number;
+  /** earned in the open period, added at its statement date */
+  pending: number;
+  redeemMin: number | null;
+  /** balance ≥ redeemMin (or no minimum known) */
+  canRedeem: boolean;
+  /** points still held, oldest first, with when they expire (null = no expiry known) */
+  lots: { close: ISODate; left: number; expires: ISODate | null }[];
+  expired: number;
+}
+
+/** A points card's balance (details.cashback.payout: points); null for other cards. */
+export function points(l: Ledger, account: string, asOf: ISODate): PointsStatus | null {
+  const a = l.accounts.find((x) => x.id === account);
+  if (!a) return null;
+  const cb = termsOf(a, recordFor(l, account)).cashback;
+  if (!cb || cb.payout !== "points") return null;
+  const periods = cashback(l, account, asOf);
+  const { map: cats } = flattenCategories(l.categories);
+  const txs = l.transactions.filter((x) => !x.void && x.date <= asOf && (x.lines.some((ln) => ln.account === account) || x.card === account));
+  const lots = periods.filter((p) => !p.open && p.expected > 0).map((p) => ({ close: p.close, left: p.expected, expires: cb.expireMonths ? addMonths(p.close, cb.expireMonths) : null }));
+  let expired = 0;
+  const expireBefore = (d: ISODate) => {
+    for (const x of lots) if (x.left > 0 && x.expires && x.expires < d) { expired += x.left; x.left = 0; }
+  };
+  const cashed = periods.length ? cashbackIn(txs, account, cats, periods[0]!.from, asOf).sort((x, y) => (x.date < y.date ? -1 : 1)) : [];
+  for (const r of cashed) {
+    expireBefore(r.date);
+    let left = r.amount;
+    for (const x of lots) {
+      if (left <= 0) break;
+      if (x.close >= r.date || x.left <= 0) continue;
+      const take = Math.min(x.left, left);
+      x.left -= take;
+      left -= take;
+    }
+  }
+  expireBefore(addDays(asOf, 1));
+  const held = lots.filter((x) => x.left > 0);
+  const balance = held.reduce((s, x) => s + x.left, 0);
+  const open = periods.find((p) => p.open);
+  return {
+    account,
+    name: a.name,
+    balance,
+    pending: open?.expected ?? 0,
+    redeemMin: cb.redeemMin,
+    canRedeem: balance > 0 && (cb.redeemMin === null || balance >= cb.redeemMin),
+    lots: held,
+    expired,
+  };
 }
 
 /* ------------------------------------------------------------------ which card to use */
@@ -313,18 +475,27 @@ export interface BestCard {
   name: string;
   rate: number | null;
   earn: number | null; // cashback this purchase would earn (cap left respected), null when the rate is unknown
-  capLeft: number | null;
+  capLeft: number | null; // cashback left under the caps that apply (the rule's and the card's)
   minSpendShort: number; // spend still missing for the minimum, after this purchase (0 = fine)
   payBy: ISODate | null;
   freeDays: number | null;
   limitLeft: number | null;
+  /** the rule that applies (its label), when the card has one for this purchase */
+  rule?: string | null;
+  /** the bank pays this rule only in store */
+  inStore?: boolean;
+  /** the last day a purchase is sure to land on this statement; after it, it counts for the next one */
+  safeUntil?: ISODate | null;
+  /** the purchase date is after safeUntil: it may post on the next statement (its minimum and caps) */
+  nextPeriod?: boolean;
   reason: string; // one line, plain English (the dashboard builds its own in the UI language)
 }
 
-export function bestCard(l: Ledger, q: { category: string; amount?: number; date: ISODate }): BestCard[] {
+export function bestCard(l: Ledger, q: { category: string; amount?: number; date: ISODate; merchant?: string }): BestCard[] {
   const amount = q.amount ?? 0;
   const owed = holdingsAt(l, q.date);
   const recs = cardsData(l).records;
+  const text = q.merchant ? fold(q.merchant) : undefined;
   const candidates: { a: Account; rec?: CardRecord }[] = [];
   for (const a of l.accounts) {
     if (!isOpen(a, q.date)) continue;
@@ -336,13 +507,23 @@ export function bestCard(l: Ledger, q: { category: string; amount?: number; date
   for (const { a, rec } of candidates) {
     const t = termsOf(a, rec);
     const cb = t.cashback;
-    const rate = cb ? rateFor(cb, q.category) : null;
+    const rule = cb ? ruleFor(cb, q.category, text) : null;
+    const rate = cb ? (rule ? rule.rate : cb.base) : null;
     let capLeft: number | null = null;
     let minShort = 0;
+    let safeUntil: ISODate | null = null;
+    let nextPeriod = false;
     if (cb) {
       const cur = cashback(l, a.id, q.date).find((p) => p.open);
-      capLeft = cb.cap ? (cur?.capLeft ?? cb.cap.amount) : null;
+      const g = rule && cur ? cur.groups.find((x) => x.label === ruleLabel(rule)) : undefined;
+      const ruleLeft = rule?.cap != null ? Math.max(0, rule.cap - (g?.earned ?? 0)) : null;
+      const cardLeft = cb.cap ? (cur?.capLeft ?? cb.cap.amount) : null;
+      capLeft = ruleLeft === null ? cardLeft : cardLeft === null ? ruleLeft : Math.min(ruleLeft, cardLeft);
       if (cb.min_spend) minShort = Math.max(0, cb.min_spend.amount - ((cur?.spend ?? 0) + amount));
+      if (a.type === "credit_card" && t.statementDay) {
+        safeUntil = cur?.safeUntil ?? null;
+        nextPeriod = safeUntil !== null && q.date > safeUntil;
+      }
     }
     const raw = rate === null ? null : Math.round((amount * rate) / 100);
     const earn = raw === null ? null : capLeft === null ? raw : Math.min(raw, capLeft);
@@ -350,11 +531,17 @@ export function bestCard(l: Ledger, q: { category: string; amount?: number; date
     const freeDays = payBy ? daysBetween(q.date, payBy) : null;
     const limitLeft = t.limit === null ? null : t.limit + (owed.get(a.id)?.amount ?? 0);
     const bits = [
-      rate === null ? "cashback rate not set" : `${rate}%${capLeft !== null ? ` (cap left ${capLeft})` : ""}`,
+      rate === null ? "cashback rate not set" : `${rate}%${rule && (rule.label || rule.merchants.length) ? ` on ${ruleLabel(rule)}` : ""}${capLeft !== null ? ` (cap left ${capLeft})` : ""}`,
+      ...(rule?.inStore ? ["in store only, not online"] : []),
       ...(minShort > 0 ? [`spend ${minShort} more for the minimum`] : []),
+      ...(nextPeriod ? [`after ${safeUntil}: may post on the next statement`] : safeUntil ? [`last safe day ${safeUntil}`] : []),
       ...(payBy ? [`pay by ${payBy} (${freeDays} days)`] : []),
     ];
-    out.push({ account: a.id, name: a.name, rate, earn, capLeft, minSpendShort: minShort, payBy, freeDays, limitLeft, reason: `${a.name}: ${bits.join(" · ")}` });
+    out.push({
+      account: a.id, name: a.name, rate, earn, capLeft, minSpendShort: minShort, payBy, freeDays, limitLeft,
+      ...(cb ? { rule: rule ? ruleLabel(rule) : null, inStore: rule?.inStore ?? false, safeUntil, nextPeriod } : {}),
+      reason: `${a.name}: ${bits.join(" · ")}`,
+    });
   }
   // no cashback (unknown or 0%) ranks by interest-free days and limit instead
   const effective = (b: BestCard) => (!b.earn ? -1 : b.minSpendShort > 0 ? b.earn / 2 : b.earn);
